@@ -11,42 +11,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          go-version: "1.25"
-      - run: go vet ./...
-      - run: |
-          go install golang.org/x/tools/cmd/staticcheck@latest || true
-          if command -v staticcheck >/dev/null 2>&1; then
-            staticcheck ./...
-          else
-            echo "staticcheck not available, skipping"
-          fi
+          components: clippy, rustfmt
+      - run: cargo fmt --check
+      - run: cargo clippy -- -D warnings
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.25"
-      - run: go test ./... -count=1 -timeout 60s -race -coverprofile=coverage.out
-      - uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: coverage.out
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --all
   build:
     runs-on: ubuntu-latest
     needs: [lint, test]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.25"
-      - run: make build
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
       - uses: actions/upload-artifact@v4
         with:
           name: initium-binary
-          path: bin/initium
+          path: target/release/initium
   helm-lint:
     runs-on: ubuntu-latest
     steps:

@@ -2,14 +2,14 @@
 
 ## Overview
 
-Initium is a single Go binary with multiple subcommands, each addressing a common initContainer use case. It follows the Unix philosophy: each subcommand does one thing well, with composability via sequential initContainers in a pod spec.
+Initium is a single Rust binary with multiple subcommands, each addressing a common initContainer use case. It follows the Unix philosophy: each subcommand does one thing well, with composability via sequential initContainers in a pod spec.
 
 ```
 ┌─────────────────────────────────────────┐
-│              cmd/initium/main.go        │
-│          (CLI root, cobra commands)     │
+│              src/main.rs                │
+│          (CLI root, clap commands)      │
 ├─────────────────────────────────────────┤
-│            internal/cmd/                │
+│               src/cmd/                  │
 │   ┌──────────┬──────────┬────────────┐  │
 │   │ wait-for │ migrate  │  render    │  │
 │   │ seed     │  fetch   │   exec     │  │
@@ -26,14 +26,20 @@ Initium is a single Go binary with multiple subcommands, each addressing a commo
 ## Directory Structure
 
 ```
-cmd/initium/          CLI entrypoint
-internal/
+src/
+  main.rs             CLI entrypoint
   cmd/                Subcommand implementations (one file per command)
-  retry/              Retry logic with exponential backoff and jitter
-  render/             Template rendering (envsubst + Go templates)
-  fetch/              HTTP fetch with auth support
-  logging/            Structured logging (text + JSON)
-  safety/             Path validation and security guardrails
+    mod.rs            Shared command execution helpers
+    wait_for.rs       Wait for endpoints
+    migrate.rs        Database migrations
+    seed.rs           Database seeding
+    render.rs         Template rendering
+    fetch.rs          HTTP fetch
+    exec.rs           Arbitrary command execution
+  retry.rs            Retry logic with exponential backoff and jitter
+  render.rs           Template rendering (envsubst + Jinja2 templates)
+  logging.rs          Structured logging (text + JSON)
+  safety.rs           Path validation and security guardrails
 charts/initium/       Helm chart
 examples/             Ready-to-use Kubernetes manifests
 docs/                 Documentation
@@ -42,7 +48,7 @@ tests/                Integration tests
 
 ## Design Principles
 
-1. **Single binary, zero runtime dependencies**: Built `FROM scratch` with statically-linked Go binary
+1. **Single binary, zero runtime dependencies**: Built `FROM scratch` with statically-linked Rust binary (musl)
 2. **Explicit over implicit**: All targets, paths, and behaviors must be explicitly configured
 3. **Fail fast with actionable errors**: Errors include context about what went wrong and how to fix it
 4. **Security by default**: Restrictive defaults that require opt-in for any relaxation
@@ -52,62 +58,58 @@ tests/                Integration tests
 
 ### 1. Create the command file
 
-Create `internal/cmd/yourcommand.go`:
+Create `src/cmd/your_command.rs`:
 
-```go
-package cmd
+```rust
+use crate::logging::Logger;
 
-import (
-    "github.com/kitstream/initium/internal/logging"
-    "github.com/spf13/cobra"
-)
-
-func NewYourCommandCmd(log *logging.Logger) *cobra.Command {
-    cmd := &cobra.Command{
-        Use:   "your-command",
-        Short: "One-line description",
-        Long:  `Detailed description with usage context.`,
-        Example: `  initium your-command --flag value`,
-        RunE: func(cmd *cobra.Command, args []string) error {
-            // Implementation here
-            return nil
-        },
-    }
-
-    // Add flags
-    cmd.Flags().StringVar(&someVar, "flag", "default", "Description")
-
-    return cmd
+pub fn run(log: &Logger, /* flags */) -> Result<(), String> {
+    log.info("starting your-command", &[]);
+    // Implementation here
+    Ok(())
 }
 ```
 
-### 2. Register the command
+### 2. Register the module
 
-In `cmd/initium/main.go`, add:
+In `src/cmd/mod.rs`, add:
 
-```go
-root.AddCommand(cmd.NewYourCommandCmd(log))
+```rust
+pub mod your_command;
 ```
 
-### 3. Write tests
+### 3. Add the subcommand variant
 
-Create `internal/cmd/yourcommand_test.go` with:
-- Unit tests for core logic
-- Tests for invalid inputs and edge cases
-- Tests for the cobra command execution
+In `src/main.rs`, add a variant to the `Commands` enum and dispatch it in the `match`:
 
-### 4. Add documentation
+```rust
+#[derive(Subcommand)]
+enum Commands {
+    // ...existing variants...
+    /// Your command description
+    YourCommand {
+        #[arg(long, help = "Description")]
+        flag: String,
+    },
+}
+```
+
+### 4. Write tests
+
+Add `#[cfg(test)]` tests in the relevant module, or create integration tests.
+
+### 5. Add documentation
 
 - Update `docs/usage.md` with flags, examples, and failure modes
 - Add an example in `examples/`
 - Update `CHANGELOG.md`
 
-### 5. Verify
+### 6. Verify
 
 ```bash
 make test
 make build
-./bin/initium your-command --help
+./target/release/initium your-command --help
 ```
 
 ## Retry System

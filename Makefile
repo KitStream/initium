@@ -1,31 +1,19 @@
 BINARY   := initium
-MODULE   := github.com/kitstream/initium
 VERSION  ?= dev
-LDFLAGS  := -s -w -X main.version=$(VERSION)
-
 .PHONY: all build test lint clean
-
 all: lint test build
-
 build:
-	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/initium
-
+cargo build --release
+cp target/release/$(BINARY) bin/$(BINARY)
 test:
-	go test ./... -count=1 -timeout 60s -race
-
+cargo test
 lint:
-	go vet ./...
-	@command -v staticcheck >/dev/null 2>&1 && staticcheck ./... || echo "staticcheck not installed, skipping"
-
+cargo clippy -- -D warnings
+cargo fmt --check
 clean:
-	rm -rf bin/
-
+cargo clean
+rm -rf bin/
 docker-build:
-	docker buildx build --platform linux/amd64,linux/arm64 \
-		--build-arg VERSION=$(VERSION) \
-		-t ghcr.io/kitstream/initium:$(VERSION) .
-
+docker build -t ghcr.io/kitstream/initium:$(VERSION) .
 docker-push:
-	docker buildx build --platform linux/amd64,linux/arm64 \
-		--build-arg VERSION=$(VERSION) \
-		-t ghcr.io/kitstream/initium:$(VERSION) --push .
+docker push ghcr.io/kitstream/initium:$(VERSION)

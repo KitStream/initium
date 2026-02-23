@@ -44,8 +44,8 @@ kubectl apply -f https://raw.githubusercontent.com/kitstream/initium/main/exampl
 | **Structured logging** | `echo` statements | JSON or text with timestamps |
 | **Security** | Runs as root, full shell | Non-root, no shell, read-only FS |
 | **Secret handling** | Easily leaked in logs | Automatic redaction |
-| **Multiple tools** | Install curl, netcat, psql… | Single 10MB image |
-| **Reproducibility** | Shell differences across distros | Single Go binary, `FROM scratch` |
+| **Multiple tools** | Install curl, netcat, psql… | Single 2MB image |
+| **Reproducibility** | Shell differences across distros | Single Rust binary, `FROM scratch` |
 | **Vulnerability surface** | Full OS + shell utils | Zero OS packages |
 
 ## Subcommands
