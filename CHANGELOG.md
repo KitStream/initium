@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Structured database seeding via `seed` subcommand with YAML/JSON spec files
+- Seed tracking table (`initium_seed` by default) for idempotent seed application
+- Support for PostgreSQL, MySQL, and SQLite database drivers
+- Auto-generated IDs and cross-table references via `_ref` / `@ref:` syntax
+- Environment variable substitution in seed values via `$env:VAR_NAME`
+- Unique key detection to prevent duplicate row insertion
+- Reset mode (`--reset`) to delete existing data and re-apply seeds
+- Transaction safety: each seed set is applied atomically with rollback on failure
+- Ordered seed sets and tables via `order` field
+- Documentation: `docs/seeding.md` with full schema reference, Kubernetes usage (env vars and volume-mounted secrets), and failure modes
+- Example seed specs: `examples/seed/basic-seed.yaml`, `examples/seed/sqlite-seed.yaml`, `examples/seed/env-credentials-seed.yaml`
+- Unit tests for seed schema parsing, database operations, executor logic, references, idempotency, reset, and edge cases
+
 ### Changed
 - Complete rewrite from Go to Rust for ~76% smaller Docker images (7.4MB → 1.8MB)
 - CLI framework changed from cobra to clap
