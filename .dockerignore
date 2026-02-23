@@ -1,0 +1,9 @@
+target/
+.git/
+bin/
+*.md
+docs/
+examples/
+charts/
+tests/
+.github/
