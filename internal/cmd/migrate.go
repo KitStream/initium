@@ -104,9 +104,17 @@ so subsequent runs become no-ops.`,
 }
 
 func runCommand(log *logging.Logger, args []string) (int, error) {
-	c := exec.Command(args[0], args[1:]...)
-	c.Stdin = nil
+	c := newExecCommand(args[0], args[1:]...)
+	return executeAndStream(log, c)
+}
 
+func newExecCommand(name string, args ...string) *exec.Cmd {
+	c := exec.Command(name, args...)
+	c.Stdin = nil
+	return c
+}
+
+func executeAndStream(log *logging.Logger, c *exec.Cmd) (int, error) {
 	stdoutPipe, err := c.StdoutPipe()
 	if err != nil {
 		return -1, fmt.Errorf("creating stdout pipe: %w", err)
@@ -118,7 +126,7 @@ func runCommand(log *logging.Logger, args []string) (int, error) {
 	}
 
 	if err := c.Start(); err != nil {
-		return -1, fmt.Errorf("starting command %q: %w", args[0], err)
+		return -1, fmt.Errorf("starting command %q: %w", c.Path, err)
 	}
 
 	var wg sync.WaitGroup

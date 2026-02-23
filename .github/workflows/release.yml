@@ -48,3 +48,17 @@ jobs:
           sbom: true
           provenance: true
 
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.jyq
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            VERSION=${{ steps.version.outputs.VERSION }}
+          tags: |
+            ghcr.io/kitstream/initium-jyq:${{ steps.version.outputs.VERSION }}
+            ghcr.io/kitstream/initium-jyq:latest
+          sbom: true
+          provenance: true
+

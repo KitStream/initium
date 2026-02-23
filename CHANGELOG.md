@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `exec` subcommand: run arbitrary commands with structured logging, exit code forwarding, and optional `--workdir` for child process working directory
+- `Dockerfile.jyq` and `initium-jyq` container image variant with pre-built `jq` and `yq` tools
+- Documentation for building custom images using Initium as a base
 - `fetch` subcommand and `internal/fetch` package: fetch secrets/config from HTTP(S) endpoints with auth header via env var, retry with backoff, TLS options, redirect control (same-site by default), and path traversal prevention
 - `render` subcommand and `internal/render` package: render templates into config files with `envsubst` (default) and Go `text/template` modes, path traversal prevention, and automatic intermediate directory creation
 - `seed` subcommand: run database seed commands with structured logging and exit code forwarding (no idempotency — distinct from `migrate`)

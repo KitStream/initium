@@ -256,13 +256,101 @@ initium fetch --url http://cdn/config --output config.json \
 | `0` | Fetch succeeded |
 | `1` | Invalid arguments, HTTP error, timeout, or path traversal |
 
-### exec _(coming soon)_
+### exec
 
-Run arbitrary commands with structured logging.
+Run an arbitrary command with structured logging and exit code forwarding.
+
+The command is executed directly via `execve` (no shell). Use `--` to separate
+initium flags from the command and its arguments.
+
+stdout and stderr are captured and logged with timestamps. The child process
+exit code is forwarded. If `--workdir` is set, the child process working
+directory is changed accordingly.
 
 ```bash
+# Run a setup script
 initium exec -- /bin/setup.sh
+
+# Run with JSON logs
 initium exec --json -- python3 /scripts/init.py
+
+# Run in a specific directory
+initium exec --workdir /app -- ./prepare.sh
+
+# Generate a private key with openssl
+initium exec --workdir /certs -- openssl genrsa -out key.pem 4096
+```
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--workdir` | _(inherit)_ | Working directory for the child process |
+| `--json` | `false` | Enable JSON log output |
+
+**Behavior:**
+
+- stdout and stderr from the command are captured and logged with timestamps
+- The child process exit code is forwarded: a non-zero exit code causes `exec` to fail
+- No shell is used: the command is executed directly via `execve`
+- The `--workdir` flag sets the child's working directory; it does not constrain file writes (unlike other subcommands)
+
+**Exit codes:**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Command succeeded |
+| `1` | Command failed, or invalid arguments |
+| _N_ | Forwarded from the command |
+
+## Building Custom Images with Initium
+
+Initium ships as a minimal `scratch`-based image. For use cases that need
+additional tools (e.g., `openssl`, `curl`, database clients), build a custom
+image using Initium as a base:
+
+```dockerfile
+FROM ghcr.io/kitstream/initium:latest AS initium
+
+FROM alpine:3.21
+COPY --from=initium /initium /usr/local/bin/initium
+
+# Install the tools you need
+RUN apk add --no-cache openssl
+
+USER 65534:65534
+ENTRYPOINT ["/usr/local/bin/initium"]
+```
+
+Then use `exec` to run your tool:
+
+```yaml
+initContainers:
+  - name: generate-key
+    image: my-registry/initium-openssl:latest
+    command: ["initium"]
+    args: ["exec", "--workdir", "/certs", "--", "openssl", "genrsa", "-out", "key.pem", "4096"]
+    volumeMounts:
+      - name: certs
+        mountPath: /certs
+```
+
+### initium-jyq: pre-built image with jq and yq
+
+For JSON/YAML processing, a pre-built variant is available:
+
+```bash
+docker pull ghcr.io/kitstream/initium-jyq:latest
+```
+
+Use it in initContainers to transform config files:
+
+```yaml
+initContainers:
+  - name: transform-config
+    image: ghcr.io/kitstream/initium-jyq:latest
+    command: ["initium"]
+    args: ["exec", "--", "jq", ".database.host = \"db.prod\"", "/config/app.json"]
 ```
 
 ## Global Flags
