@@ -11,7 +11,10 @@ pub struct Config {
 impl Config {
     pub fn validate(&self) -> Result<(), String> {
         if self.max_attempts < 1 {
-            return Err(format!("max-attempts must be >= 1, got {}", self.max_attempts));
+            return Err(format!(
+                "max-attempts must be >= 1, got {}",
+                self.max_attempts
+            ));
         }
         if self.initial_delay.is_zero() {
             return Err("initial-delay must be > 0".into());
@@ -23,10 +26,16 @@ impl Config {
             ));
         }
         if self.backoff_factor < 1.0 {
-            return Err(format!("backoff-factor must be >= 1.0, got {}", self.backoff_factor));
+            return Err(format!(
+                "backoff-factor must be >= 1.0, got {}",
+                self.backoff_factor
+            ));
         }
         if !(0.0..=1.0).contains(&self.jitter_fraction) {
-            return Err(format!("jitter-fraction must be in [0, 1], got {}", self.jitter_fraction));
+            return Err(format!(
+                "jitter-fraction must be in [0, 1], got {}",
+                self.jitter_fraction
+            ));
         }
         Ok(())
     }
@@ -59,7 +68,10 @@ where
                 if attempt == cfg.max_attempts - 1 {
                     return RetryResult {
                         attempt,
-                        err: Some(format!("all {} attempts failed, last error: {}", cfg.max_attempts, e)),
+                        err: Some(format!(
+                            "all {} attempts failed, last error: {}",
+                            cfg.max_attempts, e
+                        )),
                     };
                 }
                 let d = delay(cfg, attempt);
@@ -75,7 +87,10 @@ where
             }
         }
     }
-    RetryResult { attempt: 0, err: Some("max attempts reached".into()) }
+    RetryResult {
+        attempt: 0,
+        err: Some("max attempts reached".into()),
+    }
 }
 
 #[cfg(test)]
@@ -161,7 +176,11 @@ mod tests {
     fn test_do_eventual_success() {
         let cfg = test_config();
         let result = do_retry(&cfg, None, |attempt| {
-            if attempt < 2 { Err("not yet".into()) } else { Ok(()) }
+            if attempt < 2 {
+                Err("not yet".into())
+            } else {
+                Ok(())
+            }
         });
         assert!(result.err.is_none());
         assert_eq!(result.attempt, 2);
@@ -190,5 +209,3 @@ mod tests {
         assert!(result.err.unwrap().contains("deadline"));
     }
 }
-
-

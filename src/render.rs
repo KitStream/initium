@@ -8,14 +8,19 @@ pub fn envsubst(input: &str) -> String {
             Ok(val) => val,
             Err(_) => caps[0].to_string(),
         }
-    }).into_owned()
+    })
+    .into_owned()
 }
 pub fn template_render(input: &str) -> Result<String, String> {
     let env_map: std::collections::HashMap<String, String> = env::vars().collect();
     let mut jinja_env = minijinja::Environment::new();
     jinja_env.set_undefined_behavior(minijinja::UndefinedBehavior::Lenient);
-    jinja_env.add_template("t", input).map_err(|e| format!("parsing template: {}", e))?;
-    let tmpl = jinja_env.get_template("t").map_err(|e| format!("getting template: {}", e))?;
+    jinja_env
+        .add_template("t", input)
+        .map_err(|e| format!("parsing template: {}", e))?;
+    let tmpl = jinja_env
+        .get_template("t")
+        .map_err(|e| format!("getting template: {}", e))?;
     tmpl.render(minijinja::context!(env => env_map))
         .map_err(|e| format!("executing template: {}", e))
 }

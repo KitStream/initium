@@ -16,7 +16,10 @@ pub fn validate_file_path(workdir: &str, target: &str) -> Result<PathBuf, String
     let workdir_str = abs_workdir.to_string_lossy().to_string();
     let cleaned_str = cleaned.to_string_lossy().to_string();
     if cleaned_str != workdir_str && !cleaned_str.starts_with(&format!("{}/", workdir_str)) {
-        return Err(format!("path traversal detected: {:?} escapes workdir {:?}", target, workdir_str));
+        return Err(format!(
+            "path traversal detected: {:?} escapes workdir {:?}",
+            target, workdir_str
+        ));
     }
     Ok(cleaned)
 }
@@ -24,13 +27,19 @@ fn normalize_path(path: &Path) -> PathBuf {
     let mut components = Vec::new();
     for component in path.components() {
         match component {
-            std::path::Component::ParentDir => { if !components.is_empty() { components.pop(); } }
+            std::path::Component::ParentDir => {
+                if !components.is_empty() {
+                    components.pop();
+                }
+            }
             std::path::Component::CurDir => {}
             c => components.push(c),
         }
     }
     let mut result = PathBuf::new();
-    for c in components { result.push(c.as_os_str()); }
+    for c in components {
+        result.push(c.as_os_str());
+    }
     result
 }
 #[cfg(test)]
@@ -46,7 +55,7 @@ mod tests {
     #[test]
     fn test_traversal_rejected() {
         let dir = TempDir::new().unwrap();
-        let traversal = ["..","..","..","tmp","x"].join(&std::path::MAIN_SEPARATOR.to_string());
+        let traversal = ["..", "..", "..", "tmp", "x"].join(&std::path::MAIN_SEPARATOR.to_string());
         let result = validate_file_path(dir.path().to_str().unwrap(), &traversal);
         assert!(result.is_err());
     }

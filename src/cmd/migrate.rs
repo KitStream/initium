@@ -8,7 +8,10 @@ pub fn run(log: &Logger, args: &[String], workdir: &str, lock_file: &str) -> Res
     if !lock_file.is_empty() {
         let lock_path = safety::validate_file_path(workdir, lock_file)?;
         if lock_path.exists() {
-            log.info("lock file exists, skipping migration", &[("lock-file", lock_path.to_str().unwrap_or(""))]);
+            log.info(
+                "lock file exists, skipping migration",
+                &[("lock-file", lock_path.to_str().unwrap_or(""))],
+            );
             return Ok(());
         }
     }
@@ -20,8 +23,12 @@ pub fn run(log: &Logger, args: &[String], workdir: &str, lock_file: &str) -> Res
     if !lock_file.is_empty() {
         let lock_path = safety::validate_file_path(workdir, lock_file)?;
         fs::create_dir_all(workdir).map_err(|e| format!("creating workdir {}: {}", workdir, e))?;
-        fs::write(&lock_path, "migrated\n").map_err(|e| format!("writing lock file {:?}: {}", lock_path, e))?;
-        log.info("lock file created", &[("lock-file", lock_path.to_str().unwrap_or(""))]);
+        fs::write(&lock_path, "migrated\n")
+            .map_err(|e| format!("writing lock file {:?}: {}", lock_path, e))?;
+        log.info(
+            "lock file created",
+            &[("lock-file", lock_path.to_str().unwrap_or(""))],
+        );
     }
     log.info("migration completed successfully", &[]);
     Ok(())

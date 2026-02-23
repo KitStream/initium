@@ -1,15 +1,21 @@
+mod cmd;
 mod logging;
+mod render;
 mod retry;
 mod safety;
-mod render;
-mod cmd;
 
 use clap::{Parser, Subcommand};
 use std::time::Duration;
 
 #[derive(Parser)]
-#[command(name = "initium", version, about = "Swiss-army toolbox for Kubernetes initContainers")]
-#[command(long_about = "Initium is a multi-tool CLI for Kubernetes initContainers.\nIt provides subcommands to wait for dependencies, run migrations,\nseed databases, render config templates, fetch secrets, and execute\narbitrary commands -- all with safe defaults, structured logging,\nand security guardrails.")]
+#[command(
+    name = "initium",
+    version,
+    about = "Swiss-army toolbox for Kubernetes initContainers"
+)]
+#[command(
+    long_about = "Initium is a multi-tool CLI for Kubernetes initContainers.\nIt provides subcommands to wait for dependencies, run migrations,\nseed databases, render config templates, fetch secrets, and execute\narbitrary commands -- all with safe defaults, structured logging,\nand security guardrails."
+)]
 struct Cli {
     #[arg(long, global = true, help = "Enable JSON log output")]
     json: bool,
@@ -22,7 +28,11 @@ struct Cli {
 enum Commands {
     /// Wait for TCP or HTTP(S) endpoints to become available
     WaitFor {
-        #[arg(long, required = true, help = "Target endpoint (tcp://host:port or http(s)://...)")]
+        #[arg(
+            long,
+            required = true,
+            help = "Target endpoint (tcp://host:port or http(s)://...)"
+        )]
         target: Vec<String>,
         #[arg(long, default_value = "300", help = "Overall timeout in seconds")]
         timeout: u64,
@@ -66,7 +76,11 @@ enum Commands {
         output: String,
         #[arg(long, default_value = "/work", help = "Working directory")]
         workdir: String,
-        #[arg(long, default_value = "envsubst", help = "Template mode: envsubst or gotemplate")]
+        #[arg(
+            long,
+            default_value = "envsubst",
+            help = "Template mode: envsubst or gotemplate"
+        )]
         mode: String,
     },
 
@@ -117,7 +131,17 @@ fn main() {
     }
 
     let result = match cli.command {
-        Commands::WaitFor { target, timeout, max_attempts, initial_delay, max_delay, backoff_factor, jitter, http_status, insecure_tls } => {
+        Commands::WaitFor {
+            target,
+            timeout,
+            max_attempts,
+            initial_delay,
+            max_delay,
+            backoff_factor,
+            jitter,
+            http_status,
+            insecure_tls,
+        } => {
             let cfg = retry::Config {
                 max_attempts,
                 initial_delay: Duration::from_millis(initial_delay),
@@ -128,22 +152,51 @@ fn main() {
             if let Err(e) = cfg.validate() {
                 Err(format!("invalid retry config: {}", e))
             } else {
-                cmd::wait_for::run(&log, &target, &cfg, Duration::from_secs(timeout), http_status, insecure_tls)
+                cmd::wait_for::run(
+                    &log,
+                    &target,
+                    &cfg,
+                    Duration::from_secs(timeout),
+                    http_status,
+                    insecure_tls,
+                )
             }
         }
-        Commands::Migrate { workdir, lock_file, args } => {
-            cmd::migrate::run(&log, &args, &workdir, &lock_file)
-        }
-        Commands::Seed { args } => {
-            cmd::seed::run(&log, &args)
-        }
-        Commands::Render { template, output, workdir, mode } => {
-            cmd::render::run(&log, &template, &output, &workdir, &mode)
-        }
-        Commands::Fetch { url, output, workdir, auth_env, insecure_tls, follow_redirects, allow_cross_site_redirects, timeout, max_attempts, initial_delay, max_delay, backoff_factor, jitter } => {
+        Commands::Migrate {
+            workdir,
+            lock_file,
+            args,
+        } => cmd::migrate::run(&log, &args, &workdir, &lock_file),
+        Commands::Seed { args } => cmd::seed::run(&log, &args),
+        Commands::Render {
+            template,
+            output,
+            workdir,
+            mode,
+        } => cmd::render::run(&log, &template, &output, &workdir, &mode),
+        Commands::Fetch {
+            url,
+            output,
+            workdir,
+            auth_env,
+            insecure_tls,
+            follow_redirects,
+            allow_cross_site_redirects,
+            timeout,
+            max_attempts,
+            initial_delay,
+            max_delay,
+            backoff_factor,
+            jitter,
+        } => {
             let fetch_cfg = cmd::fetch::Config {
-                url, output, workdir, auth_env, insecure_tls,
-                follow_redirects, allow_cross_site_redirects,
+                url,
+                output,
+                workdir,
+                auth_env,
+                insecure_tls,
+                follow_redirects,
+                allow_cross_site_redirects,
                 timeout: Duration::from_secs(timeout),
             };
             let retry_cfg = retry::Config {
@@ -159,9 +212,7 @@ fn main() {
                 cmd::fetch::run(&log, &fetch_cfg, &retry_cfg)
             }
         }
-        Commands::Exec { workdir, args } => {
-            cmd::exec::run(&log, &args, &workdir)
-        }
+        Commands::Exec { workdir, args } => cmd::exec::run(&log, &args, &workdir),
     };
 
     if let Err(e) = result {
@@ -169,4 +220,3 @@ fn main() {
         std::process::exit(1);
     }
 }
-

@@ -1,8 +1,9 @@
+use chrono::Utc;
 use std::io::Write;
 use std::sync::Mutex;
-use chrono::Utc;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[allow(dead_code)]
 pub enum Level {
     Debug,
     Info,
@@ -58,7 +59,7 @@ impl Logger {
             map.insert("level".into(), serde_json::Value::String(level.to_string()));
             map.insert("msg".into(), serde_json::Value::String(msg.into()));
             for (k, v) in kvs {
-                map.insert((*k).into(), serde_json::Value::String(redact_value(k, v).into()));
+                map.insert((*k).into(), serde_json::Value::String(redact_value(k, v)));
             }
             let _ = writeln!(out, "{}", serde_json::Value::Object(map));
         } else {
@@ -70,14 +71,29 @@ impl Logger {
         }
     }
 
-    pub fn debug(&self, msg: &str, kvs: &[(&str, &str)]) { self.log(Level::Debug, msg, kvs); }
-    pub fn info(&self, msg: &str, kvs: &[(&str, &str)]) { self.log(Level::Info, msg, kvs); }
-    pub fn warn(&self, msg: &str, kvs: &[(&str, &str)]) { self.log(Level::Warn, msg, kvs); }
-    pub fn error(&self, msg: &str, kvs: &[(&str, &str)]) { self.log(Level::Error, msg, kvs); }
+    pub fn debug(&self, msg: &str, kvs: &[(&str, &str)]) {
+        self.log(Level::Debug, msg, kvs);
+    }
+    pub fn info(&self, msg: &str, kvs: &[(&str, &str)]) {
+        self.log(Level::Info, msg, kvs);
+    }
+    #[allow(dead_code)]
+    pub fn warn(&self, msg: &str, kvs: &[(&str, &str)]) {
+        self.log(Level::Warn, msg, kvs);
+    }
+    pub fn error(&self, msg: &str, kvs: &[(&str, &str)]) {
+        self.log(Level::Error, msg, kvs);
+    }
 }
 
 const SENSITIVE_KEYS: &[&str] = &[
-    "password", "secret", "token", "authorization", "auth", "api_key", "apikey",
+    "password",
+    "secret",
+    "token",
+    "authorization",
+    "auth",
+    "api_key",
+    "apikey",
 ];
 
 pub fn redact_value(key: &str, value: &str) -> String {
@@ -102,7 +118,9 @@ mod tests {
             fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
                 self.0.lock().unwrap().write(data)
             }
-            fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
         }
         let logger = Arc::new(Logger::new(Box::new(SharedBuf(buf.clone())), json, level));
         (logger, buf)
@@ -165,4 +183,3 @@ mod tests {
         assert!(output.contains("k2=v2"));
     }
 }
-
