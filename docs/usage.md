@@ -154,13 +154,47 @@ initium seed --json -- python3 /scripts/seed.py
 | `1` | Seed command failed, or invalid arguments |
 | _N_ | Forwarded from the seed command |
 
-### render _(coming soon)_
+### render
 
-Render templates into config files.
+Render a template file into a config file using environment variable substitution.
+
+Two modes are supported:
+
+- **envsubst** (default) — replaces `${VAR}` and `$VAR` patterns with environment variable values. Missing variables are left as-is.
+- **gotemplate** — full Go `text/template` support with environment variables as `.VarName`. Missing variables produce empty strings.
+
+Output files are written relative to `--workdir` with path traversal prevention. Intermediate directories are created automatically.
 
 ```bash
-initium render --template /templates/app.conf.tmpl --output config/app.conf --workdir /work
+# envsubst mode (default)
+initium render --template /templates/app.conf.tmpl --output app.conf
+
+# Go template mode
+initium render --mode gotemplate --template /templates/app.conf.tmpl --output app.conf
+
+# Custom workdir
+initium render --template /tpl/nginx.conf.tmpl --output nginx.conf --workdir /etc/nginx
+
+# Nested output directory (created automatically)
+initium render --template /tpl/db.conf.tmpl --output config/db.conf --workdir /work
 ```
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--template` | _(required)_ | Path to template file |
+| `--output` | _(required)_ | Output file path relative to workdir |
+| `--workdir` | `/work` | Working directory for output files |
+| `--mode` | `envsubst` | Template mode: `envsubst` or `gotemplate` |
+| `--json` | `false` | Enable JSON log output |
+
+**Exit codes:**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Render succeeded |
+| `1` | Invalid arguments, missing template, template syntax error, or path traversal |
 
 ### fetch _(coming soon)_
 
