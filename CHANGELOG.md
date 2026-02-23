@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Seed executor tests now verify data actually arrived in the database after execution, using file-based SQLite and post-execution queries to assert row counts, column values, cross-table references, env substitution, ordering, and edge cases
 
 ### Fixed
+- Fixed clippy `collapsible_if` lint in seed executor's unique key check
 - Removed dead code: unused `src/cmd/seed.rs` module (replaced by `src/seed/`)
 - Suppressed unused field warning on `AutoIdConfig.id_type` (reserved for future use)
 - Removed unused imports (`Arc`, `Mutex`) and unused mutable binding in seed executor tests

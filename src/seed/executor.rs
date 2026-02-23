@@ -136,14 +136,14 @@ impl<'a> SeedExecutor<'a> {
                 }
             }
 
-            if !ts.unique_key.is_empty() {
-                if self.db.row_exists(table, &unique_columns, &unique_values)? {
-                    self.log.info(
-                        "row already exists, skipping",
-                        &[("table", table.as_str()), ("row", &(idx + 1).to_string())],
-                    );
-                    continue;
-                }
+            if !ts.unique_key.is_empty()
+                && self.db.row_exists(table, &unique_columns, &unique_values)?
+            {
+                self.log.info(
+                    "row already exists, skipping",
+                    &[("table", table.as_str()), ("row", &(idx + 1).to_string())],
+                );
+                continue;
             }
 
             let generated_id = self.db.insert_row(table, &columns, &values)?;

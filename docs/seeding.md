@@ -56,21 +56,21 @@ seed_sets:
 
 ### Field reference
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `version` | string | Yes | Must be `"1"` |
-| `database.driver` | string | Yes | Database driver: `postgres`, `mysql`, or `sqlite` |
-| `database.url` | string | No | Direct database connection URL |
-| `database.url_env` | string | No | Environment variable containing the database URL |
-| `database.tracking_table` | string | No | Name of the seed tracking table (default: `initium_seed`) |
-| `seed_sets[].name` | string | Yes | Unique name for the seed set (used in tracking) |
-| `seed_sets[].order` | integer | No | Execution order (lower values first, default: 0) |
-| `seed_sets[].tables[].table` | string | Yes | Target database table name |
-| `seed_sets[].tables[].order` | integer | No | Execution order within the seed set (default: 0) |
-| `seed_sets[].tables[].unique_key` | string[] | No | Columns for duplicate detection |
-| `seed_sets[].tables[].auto_id.column` | string | No | Auto-generated ID column name |
-| `seed_sets[].tables[].auto_id.id_type` | string | No | ID type (default: `integer`) |
-| `seed_sets[].tables[].rows[]._ref` | string | No | Internal reference name for cross-table references |
+| Field                                  | Type     | Required | Description                                               |
+|----------------------------------------|----------|----------|-----------------------------------------------------------|
+| `version`                              | string   | Yes      | Must be `"1"`                                             |
+| `database.driver`                      | string   | Yes      | Database driver: `postgres`, `mysql`, or `sqlite`         |
+| `database.url`                         | string   | No       | Direct database connection URL                            |
+| `database.url_env`                     | string   | No       | Environment variable containing the database URL          |
+| `database.tracking_table`              | string   | No       | Name of the seed tracking table (default: `initium_seed`) |
+| `seed_sets[].name`                     | string   | Yes      | Unique name for the seed set (used in tracking)           |
+| `seed_sets[].order`                    | integer  | No       | Execution order (lower values first, default: 0)          |
+| `seed_sets[].tables[].table`           | string   | Yes      | Target database table name                                |
+| `seed_sets[].tables[].order`           | integer  | No       | Execution order within the seed set (default: 0)          |
+| `seed_sets[].tables[].unique_key`      | string[] | No       | Columns for duplicate detection                           |
+| `seed_sets[].tables[].auto_id.column`  | string   | No       | Auto-generated ID column name                             |
+| `seed_sets[].tables[].auto_id.id_type` | string   | No       | ID type (default: `integer`)                              |
+| `seed_sets[].tables[].rows[]._ref`     | string   | No       | Internal reference name for cross-table references        |
 
 ### Database URL resolution
 
@@ -205,64 +205,27 @@ spec:
         name: seed-specs
 ```
 
-### Credentials via Volume-Mounted Secrets
-
-```yaml
-apiVersion: v1
-kind: Pod
-spec:
-  initContainers:
-    - name: seed-data
-      image: ghcr.io/kitstream/initium:latest
-      args: ["seed", "--spec", "/seeds/seed.yaml"]
-      env:
-        # Read the database URL from a mounted secret file
-        - name: DATABASE_URL
-          value: "$(cat /secrets/db-url)"
-      volumeMounts:
-        - name: seed-specs
-          mountPath: /seeds
-          readOnly: true
-        - name: db-secrets
-          mountPath: /secrets
-          readOnly: true
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 65534
-        readOnlyRootFilesystem: true
-        allowPrivilegeEscalation: false
-        capabilities:
-          drop: [ALL]
-  volumes:
-    - name: seed-specs
-      configMap:
-        name: seed-specs
-    - name: db-secrets
-      secret:
-        secretName: db-credentials
-```
-
 ## CLI Reference
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--spec` | (required) | Path to seed spec file (YAML or JSON) |
-| `--reset` | `false` | Delete existing data and re-apply seeds |
-| `--json` | `false` | Enable JSON log output |
+| Flag      | Default    | Description |
+|-----------|------------|-------------|
+| `--spec`  | (required) | Path to seed spec file (YAML or JSON) |
+| `--reset` | `false`    | Delete existing data and re-apply seeds |
+| `--json`  | `false`    | Enable JSON log output |
 
 ## Failure Modes
 
-| Scenario | Behavior |
-|----------|----------|
-| Invalid spec file | Fails with parse error before connecting to database |
-| Database unreachable | Fails with connection error |
-| Unsupported driver | Fails with descriptive error listing supported drivers |
-| Missing env var for URL | Fails with error naming the missing variable |
-| Missing env var in `$env:` | Fails with error naming the missing variable |
-| Unresolved `@ref:` | Fails with error naming the missing reference |
-| Row insertion failure | Entire seed set rolled back via transaction |
-| Duplicate row (with unique_key) | Row silently skipped |
-| Already-applied seed set | Seed set silently skipped |
+| Scenario                        | Behavior                                               |
+|---------------------------------|--------------------------------------------------------|
+| Invalid spec file               | Fails with parse error before connecting to database   |
+| Database unreachable            | Fails with connection error                            |
+| Unsupported driver              | Fails with descriptive error listing supported drivers |
+| Missing env var for URL         | Fails with error naming the missing variable           |
+| Missing env var in `$env:`      | Fails with error naming the missing variable           |
+| Unresolved `@ref:`              | Fails with error naming the missing reference          |
+| Row insertion failure           | Entire seed set rolled back via transaction            |
+| Duplicate row (with unique_key) | Row silently skipped                                   |
+| Already-applied seed set        | Seed set silently skipped                              |
 
 ## Examples
 
