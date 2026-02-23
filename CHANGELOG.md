@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- FAQ.md with functionality, security, and deployment questions for junior-to-mid-level engineers
 - Project scaffolding with Go module, CLI framework (cobra), and repo layout
 - `wait-for` subcommand: wait for TCP and HTTP(S) endpoints with retries, exponential backoff, and jitter
 - `internal/retry` package with configurable retry logic, backoff, and jitter

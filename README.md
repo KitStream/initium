@@ -274,6 +274,7 @@ helm install my-app charts/initium \
 
 ## Documentation
 
+- [FAQ](FAQ.md) — Common questions about functionality, security, and deployment
 - [Usage Guide](docs/usage.md) — All subcommands, flags, and examples
 - [Security](docs/security.md) — Threat model, safe defaults, PSA compatibility
 - [Architecture & Design](docs/design.md) — How Initium works and how to extend it
