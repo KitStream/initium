@@ -12,20 +12,15 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" \
     -o /initium ./cmd/initium
 
-FROM alpine:3.21 AS tools
+FROM alpine:3.21
 
-RUN apk add --no-cache jq yq
+RUN apk add --no-cache jq yq ca-certificates \
+    && rm -rf /var/cache/apk/*
 
-FROM scratch
-
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /initium /initium
-COPY --from=tools /usr/bin/jq /usr/bin/jq
-COPY --from=tools /usr/bin/yq /usr/bin/yq
-COPY --from=tools /lib/ld-musl-* /lib/
-COPY --from=tools /usr/lib/libintl* /usr/lib/
 
 USER 65534:65534
 
 ENTRYPOINT ["/initium"]
+
 
