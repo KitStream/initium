@@ -1,0 +1,88 @@
+# Config render example
+#
+# This example shows a deployment that renders a config template
+# using environment variables before starting the main container.
+#
+# Usage:
+#   kubectl apply -f examples/config-render/
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-template
+data:
+  app.conf.tmpl: |
+    server {
+      listen {{ .PORT | default "8080" }};
+      database_host {{ .DB_HOST }};
+      database_port {{ .DB_PORT }};
+      log_level {{ .LOG_LEVEL | default "info" }};
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-with-config
+  labels:
+    app: app-with-config
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app-with-config
+  template:
+    metadata:
+      labels:
+        app: app-with-config
+    spec:
+      initContainers:
+        - name: render-config
+          image: ghcr.io/kitstream/initium:latest
+          args:
+            - render
+            - --template
+            - /templates/app.conf.tmpl
+            - --output
+            - config/app.conf
+            - --workdir
+            - /work
+          env:
+            - name: DB_HOST
+              value: postgres
+            - name: DB_PORT
+              value: "5432"
+            - name: PORT
+              value: "9090"
+            - name: LOG_LEVEL
+              value: debug
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: workdir
+              mountPath: /work
+            - name: templates
+              mountPath: /templates
+              readOnly: true
+
+      containers:
+        - name: app
+          image: myapp:latest
+          ports:
+            - containerPort: 9090
+          volumeMounts:
+            - name: workdir
+              mountPath: /work
+              readOnly: true
+
+      volumes:
+        - name: workdir
+          emptyDir: {}
+        - name: templates
+          configMap:
+            name: app-template
+

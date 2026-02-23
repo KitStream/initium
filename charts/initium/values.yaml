@@ -1,0 +1,85 @@
+# Initium Helm Chart - Default Values
+#
+# This chart installs nothing by default. It provides templates for
+# injecting Initium initContainers into your workloads.
+
+image:
+  repository: ghcr.io/kitstream/initium
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+# Common security context for all Initium initContainers.
+# These are best-practice defaults and should not be relaxed without reason.
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  runAsGroup: 65534
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+# Shared volume for initContainers to write output that the main container reads.
+workdir: /work
+
+# Enable the sample deployment that demonstrates Initium usage.
+sampleDeployment:
+  enabled: false
+  name: sample-app
+  replicas: 1
+  mainContainer:
+    image: nginx:1.27-alpine
+    port: 80
+
+# Define initContainers that Initium should run.
+# Each entry becomes an initContainer in the sample deployment.
+#
+# Example: wait for Postgres, render config, then run migration
+initContainers:
+  # - name: wait-for-postgres
+  #   command: ["wait-for"]
+  #   args:
+  #     - --target
+  #     - tcp://postgres:5432
+  #     - --timeout
+  #     - "120s"
+  #     - --max-attempts
+  #     - "30"
+
+  # - name: render-config
+  #   command: ["render"]
+  #   args:
+  #     - --template
+  #     - /templates/app.conf.tmpl
+  #     - --output
+  #     - config/app.conf
+  #     - --workdir
+  #     - /work
+  #   env:
+  #     - name: DB_HOST
+  #       value: postgres
+  #     - name: DB_PORT
+  #       value: "5432"
+
+  # - name: run-migration
+  #   command: ["migrate"]
+  #   args:
+  #     - --
+  #     - /usr/bin/flyway
+  #     - migrate
+  #   env:
+  #     - name: FLYWAY_URL
+  #       value: jdbc:postgresql://postgres:5432/mydb
+
+# Additional volumes to mount into initContainers
+extraVolumes: []
+  # - name: templates
+  #   configMap:
+  #     name: app-templates
+
+extraVolumeMounts: []
+  # - name: templates
+  #   mountPath: /templates
+  #   readOnly: true
+

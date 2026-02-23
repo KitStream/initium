@@ -1,0 +1,16 @@
+# IDE
+.idea/
+*.iml
+# Go
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+# Test
+*.test
+*.out
+coverage.out
+# OS
+.DS_Store
+Thumbs.db

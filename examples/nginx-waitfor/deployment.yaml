@@ -1,0 +1,48 @@
+# Nginx with wait-for example
+#
+# This example deploys nginx that waits for a backend service
+# to be reachable before starting.
+#
+# Usage:
+#   kubectl apply -f examples/nginx-waitfor/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-with-waitfor
+  labels:
+    app: nginx-with-waitfor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-with-waitfor
+  template:
+    metadata:
+      labels:
+        app: nginx-with-waitfor
+    spec:
+      initContainers:
+        - name: wait-for-backend
+          image: ghcr.io/kitstream/initium:latest
+          args:
+            - wait-for
+            - --target
+            - tcp://backend-service:8080
+            - --timeout
+            - "120s"
+            - --max-attempts
+            - "30"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+

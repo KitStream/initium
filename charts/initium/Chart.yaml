@@ -1,0 +1,19 @@
+apiVersion: v2
+name: initium
+description: A Helm chart for injecting Initium initContainers into Kubernetes workloads
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/kitstream/initium
+sources:
+  - https://github.com/kitstream/initium
+maintainers:
+  - name: Kitstream
+    url: https://github.com/kitstream
+keywords:
+  - initcontainer
+  - init
+  - wait
+  - migration
+  - kubernetes
+

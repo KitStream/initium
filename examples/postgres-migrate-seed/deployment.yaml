@@ -1,0 +1,110 @@
+# Postgres migrate + seed example
+#
+# This example shows a deployment that:
+# 1. Waits for Postgres to be reachable
+# 2. Runs database migrations
+# 3. Seeds initial data
+#
+# Usage:
+#   kubectl apply -f examples/postgres-migrate-seed/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-with-migration
+  labels:
+    app: app-with-migration
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app-with-migration
+  template:
+    metadata:
+      labels:
+        app: app-with-migration
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: ghcr.io/kitstream/initium:latest
+          args:
+            - wait-for
+            - --target
+            - tcp://postgres:5432
+            - --timeout
+            - "120s"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+        - name: run-migration
+          image: ghcr.io/kitstream/initium:latest
+          args:
+            - migrate
+            - --
+            - /app/migrate
+            - -path
+            - /migrations
+            - up
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: url
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: workdir
+              mountPath: /work
+
+        - name: seed-data
+          image: ghcr.io/kitstream/initium:latest
+          args:
+            - seed
+            - --
+            - /app/seed
+            - --file
+            - /seeds/initial.sql
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: url
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: workdir
+              mountPath: /work
+
+      containers:
+        - name: app
+          image: myapp:latest
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: workdir
+              mountPath: /work
+              readOnly: true
+
+      volumes:
+        - name: workdir
+          emptyDir: {}
+
