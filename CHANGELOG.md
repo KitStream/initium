@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `seed` subcommand: run database seed commands with structured logging and exit code forwarding (no idempotency — distinct from `migrate`)
 - `migrate` subcommand: run database migration commands with structured logging, exit code forwarding, and optional idempotency via `--lock-file`
 - FAQ.md with functionality, security, and deployment questions for junior-to-mid-level engineers
 - Project scaffolding with Go module, CLI framework (cobra), and repo layout

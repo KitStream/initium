@@ -113,13 +113,46 @@ initium migrate --lock-file .migrated --workdir /work -- /app/migrate up
 | `1` | Migration command failed, or invalid arguments |
 | _N_ | Forwarded from the migration command |
 
-### seed _(coming soon)_
+### seed
 
-Run a database seed command.
+Run a database seed command with structured logging and exit code forwarding.
+
+The command is executed directly via `execve` (no shell). Use `--` to separate
+initium flags from the seed command and its arguments.
+
+Unlike `migrate`, `seed` has no idempotency hints — it is the caller's
+responsibility to ensure seed operations are safe to repeat or are only run once.
 
 ```bash
+# Seed from a SQL file
+initium seed -- psql -f /seeds/data.sql
+
+# Seed with a custom script
 initium seed -- /app/seed --file /seeds/data.sql
+
+# Seed with JSON logs
+initium seed --json -- python3 /scripts/seed.py
 ```
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--json` | `false` | Enable JSON log output |
+
+**Behavior:**
+
+- stdout and stderr from the seed command are captured and logged with timestamps
+- The child process exit code is forwarded: a non-zero exit code causes `seed` to fail
+- No shell is used: the command is executed directly via `execve`
+
+**Exit codes:**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Seed succeeded |
+| `1` | Seed command failed, or invalid arguments |
+| _N_ | Forwarded from the seed command |
 
 ### render _(coming soon)_
 
