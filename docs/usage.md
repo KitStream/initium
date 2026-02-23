@@ -196,13 +196,65 @@ initium render --template /tpl/db.conf.tmpl --output config/db.conf --workdir /w
 | `0` | Render succeeded |
 | `1` | Invalid arguments, missing template, template syntax error, or path traversal |
 
-### fetch _(coming soon)_
+### fetch
 
-Fetch secrets or config from HTTP endpoints.
+Fetch a resource from an HTTP(S) endpoint and write the response body to a file.
+
+Supports optional authentication via an environment variable (to avoid leaking
+credentials in process argument lists), TLS verification skipping, redirect
+control, and retries with exponential backoff.
 
 ```bash
-initium fetch --url https://vault:8200/v1/secret/data/app --output secrets.json --workdir /work
+# Fetch a config file
+initium fetch --url http://config-service:8080/app.json --output app.json
+
+# Fetch from Vault with auth token
+initium fetch --url https://vault:8200/v1/secret/data/app --output secrets.json \
+  --auth-env VAULT_TOKEN --insecure-tls
+
+# Fetch with retries
+initium fetch --url http://api:8080/config --output config.json \
+  --max-attempts 10 --initial-delay 2s
+
+# Follow redirects (same-site only by default)
+initium fetch --url http://cdn/config --output config.json --follow-redirects
+
+# Allow cross-site redirects
+initium fetch --url http://cdn/config --output config.json \
+  --follow-redirects --allow-cross-site-redirects
 ```
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--url` | _(required)_ | Target URL to fetch |
+| `--output` | _(required)_ | Output file path relative to workdir |
+| `--workdir` | `/work` | Working directory for output files |
+| `--auth-env` | _(none)_ | Name of env var containing the Authorization header value |
+| `--insecure-tls` | `false` | Skip TLS certificate verification |
+| `--follow-redirects` | `false` | Follow HTTP redirects |
+| `--allow-cross-site-redirects` | `false` | Allow cross-site redirects (requires `--follow-redirects`) |
+| `--timeout` | `5m` | Overall timeout |
+| `--max-attempts` | `3` | Maximum retry attempts |
+| `--initial-delay` | `1s` | Initial delay between retries |
+| `--max-delay` | `30s` | Maximum delay between retries |
+| `--backoff-factor` | `2.0` | Backoff multiplier |
+| `--jitter` | `0.1` | Jitter fraction (0.0–1.0) |
+| `--json` | `false` | Enable JSON log output |
+
+**Security notes:**
+
+- The `--auth-env` flag takes the **name** of an environment variable, not the token itself, to avoid leaking credentials in process argument lists or shell history.
+- Redirects are disabled by default. When enabled with `--follow-redirects`, cross-site redirects are blocked unless `--allow-cross-site-redirects` is also set.
+- TLS verification is enabled by default; `--insecure-tls` must be explicitly set.
+
+**Exit codes:**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Fetch succeeded |
+| `1` | Invalid arguments, HTTP error, timeout, or path traversal |
 
 ### exec _(coming soon)_
 

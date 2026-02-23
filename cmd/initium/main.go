@@ -36,6 +36,7 @@ and security guardrails.`,
 	root.AddCommand(cmd.NewMigrateCmd(log))
 	root.AddCommand(cmd.NewSeedCmd(log))
 	root.AddCommand(cmd.NewRenderCmd(log))
+	root.AddCommand(cmd.NewFetchCmd(log))
 	if err := root.Execute(); err != nil {
 		log.Error(err.Error())
 		os.Exit(1)
