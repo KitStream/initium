@@ -1,6 +1,7 @@
 FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 
-ARG TARGETOS TARGETARCH
+ARG TARGETOS
+ARG TARGETARCH
 ARG VERSION=dev
 
 WORKDIR /src
@@ -22,5 +23,6 @@ COPY --from=builder /initium /initium
 USER 65534:65534
 
 ENTRYPOINT ["/initium"]
+
 
 
