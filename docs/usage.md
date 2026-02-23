@@ -67,14 +67,51 @@ initium wait-for \
 
 Targets are checked sequentially. All must become reachable before the command succeeds.
 
-### migrate _(coming soon)_
+### migrate
 
-Run a database migration command with structured logging.
+Run a database migration command with structured logging, exit code forwarding,
+and optional idempotency via a lock file.
+
+The command is executed directly via `execve` (no shell). Use `--` to separate
+initium flags from the migration command and its arguments.
 
 ```bash
+# Run a flyway migration
 initium migrate -- flyway migrate
+
+# Run with JSON logs
 initium migrate --json -- /app/migrate -path /migrations up
+
+# Idempotent: skip if already migrated
+initium migrate --lock-file .migrated --workdir /work -- /app/migrate up
 ```
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--workdir` | `/work` | Working directory for file operations |
+| `--lock-file` | _(none)_ | Skip migration if this file exists in workdir (idempotency) |
+| `--json` | `false` | Enable JSON log output |
+
+**Behavior:**
+
+- stdout and stderr from the migration command are captured and logged with timestamps
+- The child process exit code is forwarded: a non-zero exit code causes `migrate` to fail
+- When `--lock-file` is set:
+  - If the lock file exists in `--workdir`, the migration is skipped (exit 0)
+  - On successful completion, the lock file is created so subsequent runs become no-ops
+  - If the migration fails, no lock file is created
+- Lock file paths are validated against `--workdir` to prevent path traversal
+- No shell is used: the command is executed directly via `execve`
+
+**Exit codes:**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Migration succeeded (or skipped via lock file) |
+| `1` | Migration command failed, or invalid arguments |
+| _N_ | Forwarded from the migration command |
 
 ### seed _(coming soon)_
 

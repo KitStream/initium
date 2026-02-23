@@ -80,7 +80,6 @@ func TestNewCheckerHTTPS(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// Without insecure-tls, this should fail (self-signed cert)
 	checker, err := newChecker(srv.URL, 200, false, 5*time.Second)
 	if err != nil {
 		t.Fatalf("newChecker failed: %v", err)
@@ -89,7 +88,6 @@ func TestNewCheckerHTTPS(t *testing.T) {
 		t.Fatal("expected error for self-signed cert without insecure-tls")
 	}
 
-	// With insecure-tls, this should succeed
 	checker2, err := newChecker(srv.URL, 200, true, 5*time.Second)
 	if err != nil {
 		t.Fatalf("newChecker failed: %v", err)

@@ -8,6 +8,7 @@ import (
 
 type loggerKey struct{}
 
+// withLogger returns a new context.Context that carries a logger.
 func withLogger(ctx context.Context, log *logging.Logger) context.Context {
 	return context.WithValue(ctx, loggerKey{}, log)
 }
