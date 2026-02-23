@@ -52,7 +52,9 @@ pub struct TableSeed {
 #[derive(Debug, Deserialize, Clone)]
 pub struct AutoIdConfig {
     pub column: String,
+    /// Reserved for future use (e.g. UUID generation); parsed from spec for forward compatibility.
     #[serde(default = "default_auto_id_type")]
+    #[allow(dead_code)]
     pub id_type: String,
 }
 

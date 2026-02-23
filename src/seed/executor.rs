@@ -217,7 +217,6 @@ mod tests {
     use crate::seed::db::SqliteDb;
     use crate::seed::schema::SeedPlan;
     use std::io::Write;
-    use std::sync::{Arc, Mutex};
 
     fn test_logger() -> Logger {
         struct NullWriter;
@@ -260,12 +259,33 @@ seed_sets:
           - name: Sales
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        let sqlite = SqliteDb::connect(":memory:").unwrap();
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
         setup_db_with_tables(&sqlite);
 
         let log = test_logger();
         let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
         executor.execute(&plan).unwrap();
+
+        let db = SqliteDb::connect(db_path_str).unwrap();
+        let count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM departments", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 2, "expected 2 departments");
+
+        let names: Vec<String> = db
+            .conn
+            .prepare("SELECT name FROM departments ORDER BY name")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(names, vec!["Engineering", "Sales"]);
     }
 
     #[test]
@@ -284,7 +304,11 @@ seed_sets:
           - name: Engineering
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        let sqlite = SqliteDb::connect(":memory:").unwrap();
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
         setup_db_with_tables(&sqlite);
 
         let log = test_logger();
@@ -292,6 +316,22 @@ seed_sets:
         executor.execute(&plan).unwrap();
         // Second execution should skip (already applied)
         executor.execute(&plan).unwrap();
+
+        let db = SqliteDb::connect(db_path_str).unwrap();
+        let count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM departments", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(
+            count, 1,
+            "expected exactly 1 department after idempotent re-run"
+        );
+
+        let name: String = db
+            .conn
+            .query_row("SELECT name FROM departments", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(name, "Engineering");
     }
 
     #[test]
@@ -311,12 +351,29 @@ seed_sets:
           - name: Engineering
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        let sqlite = SqliteDb::connect(":memory:").unwrap();
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
         setup_db_with_tables(&sqlite);
 
         let log = test_logger();
         let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
         executor.execute(&plan).unwrap();
+
+        let db = SqliteDb::connect(db_path_str).unwrap();
+        let count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM departments", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1, "duplicate row should have been skipped");
+
+        let name: String = db
+            .conn
+            .query_row("SELECT name FROM departments", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(name, "Engineering");
     }
 
     #[test]
@@ -344,12 +401,191 @@ seed_sets:
             department_id: "@ref:dept_eng.id"
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        let sqlite = SqliteDb::connect(":memory:").unwrap();
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
         setup_db_with_tables(&sqlite);
 
         let log = test_logger();
         let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
         executor.execute(&plan).unwrap();
+
+        let db = SqliteDb::connect(db_path_str).unwrap();
+        let dept_id: Option<i64> = db
+            .conn
+            .query_row(
+                "SELECT id FROM departments WHERE name = 'Engineering'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(dept_id.is_some(), "department id should not be NULL");
+        let dept_id = dept_id.unwrap();
+
+        let (emp_name, emp_email, emp_dept_id): (String, String, Option<i64>) = db
+            .conn
+            .query_row(
+                "SELECT name, email, department_id FROM employees",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert!(
+            emp_dept_id.is_some(),
+            "employee department_id should not be NULL"
+        );
+        let emp_dept_id = emp_dept_id.unwrap();
+        assert_eq!(emp_name, "Alice");
+        assert_eq!(emp_email, "alice@example.com");
+        assert_eq!(
+            emp_dept_id, dept_id,
+            "employee department_id should match referenced department"
+        );
+    }
+
+    #[test]
+    fn test_multiple_references_same_table() {
+        let yaml = r#"
+version: "1"
+database:
+  driver: sqlite
+  url: ":memory:"
+seed_sets:
+  - name: multi_refs
+    tables:
+      - table: departments
+        order: 1
+        auto_id:
+          column: id
+        rows:
+          - _ref: dept_eng
+            name: Engineering
+          - _ref: dept_sales
+            name: Sales
+      - table: employees
+        order: 2
+        rows:
+          - name: Alice
+            email: alice@example.com
+            department_id: "@ref:dept_eng.id"
+          - name: Bob
+            email: bob@example.com
+            department_id: "@ref:dept_eng.id"
+          - name: Carol
+            email: carol@example.com
+            department_id: "@ref:dept_sales.id"
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
+        setup_db_with_tables(&sqlite);
+
+        let log = test_logger();
+        let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
+        executor.execute(&plan).unwrap();
+
+        let db = SqliteDb::connect(db_path_str).unwrap();
+
+        // Verify 2 departments with different IDs
+        let dept_count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM departments", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(dept_count, 2, "expected 2 departments");
+
+        let eng_id: Option<i64> = db
+            .conn
+            .query_row(
+                "SELECT id FROM departments WHERE name = 'Engineering'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(
+            eng_id.is_some(),
+            "Engineering department id should not be NULL"
+        );
+        let eng_id = eng_id.unwrap();
+
+        let sales_id: Option<i64> = db
+            .conn
+            .query_row("SELECT id FROM departments WHERE name = 'Sales'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert!(sales_id.is_some(), "Sales department id should not be NULL");
+        let sales_id = sales_id.unwrap();
+
+        assert_ne!(
+            eng_id, sales_id,
+            "department IDs should be different between rows"
+        );
+
+        // Verify 3 employees
+        let emp_count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM employees", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(emp_count, 3, "expected 3 employees");
+
+        // Verify Alice -> Engineering
+        let alice_dept: Option<i64> = db
+            .conn
+            .query_row(
+                "SELECT department_id FROM employees WHERE name = 'Alice'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(
+            alice_dept.is_some(),
+            "Alice department_id should not be NULL"
+        );
+        assert_eq!(
+            alice_dept.unwrap(),
+            eng_id,
+            "Alice should reference Engineering department"
+        );
+
+        // Verify Bob -> Engineering
+        let bob_dept: Option<i64> = db
+            .conn
+            .query_row(
+                "SELECT department_id FROM employees WHERE name = 'Bob'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(bob_dept.is_some(), "Bob department_id should not be NULL");
+        assert_eq!(
+            bob_dept.unwrap(),
+            eng_id,
+            "Bob should reference Engineering department"
+        );
+
+        // Verify Carol -> Sales
+        let carol_dept: Option<i64> = db
+            .conn
+            .query_row(
+                "SELECT department_id FROM employees WHERE name = 'Carol'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(
+            carol_dept.is_some(),
+            "Carol department_id should not be NULL"
+        );
+        assert_eq!(
+            carol_dept.unwrap(),
+            sales_id,
+            "Carol should reference Sales department"
+        );
     }
 
     #[test]
@@ -375,7 +611,7 @@ seed_sets:
 
         // First apply normally
         {
-            let mut executor = SeedExecutor::new(
+            let _executor = SeedExecutor::new(
                 &log,
                 Box::new(SqliteDb::connect(":memory:").unwrap()),
                 "initium_seed".into(),
@@ -435,13 +671,24 @@ seed_sets:
           - name: "$env:TEST_SEED_DEPT_NAME"
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        let sqlite = SqliteDb::connect(":memory:").unwrap();
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
         setup_db_with_tables(&sqlite);
 
         let log = test_logger();
         let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
         executor.execute(&plan).unwrap();
         std::env::remove_var("TEST_SEED_DEPT_NAME");
+
+        let db = SqliteDb::connect(db_path_str).unwrap();
+        let name: String = db
+            .conn
+            .query_row("SELECT name FROM departments", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(name, "FromEnv", "env variable should have been substituted");
     }
 
     #[test]
@@ -466,12 +713,38 @@ seed_sets:
           - name: Dept1
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        let sqlite = SqliteDb::connect(":memory:").unwrap();
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
         setup_db_with_tables(&sqlite);
 
         let log = test_logger();
         let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
         executor.execute(&plan).unwrap();
+
+        let db = SqliteDb::connect(db_path_str).unwrap();
+        let count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM departments", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 2, "both seed sets should have been applied");
+
+        // "first" (order=1) runs before "second" (order=2), so Dept1 gets id 1
+        let names: Vec<String> = db
+            .conn
+            .prepare("SELECT name FROM departments ORDER BY id")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(
+            names,
+            vec!["Dept1", "Dept2"],
+            "seed sets should be applied in order"
+        );
     }
 
     #[test]
@@ -488,12 +761,26 @@ seed_sets:
         rows: []
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        let sqlite = SqliteDb::connect(":memory:").unwrap();
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
         setup_db_with_tables(&sqlite);
 
         let log = test_logger();
         let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
         executor.execute(&plan).unwrap();
+
+        let db = SqliteDb::connect(db_path_str).unwrap();
+        let count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM departments", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(
+            count, 0,
+            "no rows should have been inserted for empty rows list"
+        );
     }
 
     #[test]
@@ -538,7 +825,11 @@ seed_sets:
             value: true
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        let sqlite = SqliteDb::connect(":memory:").unwrap();
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
         sqlite
             .conn
             .execute("CREATE TABLE config (key TEXT, value TEXT)", [])
@@ -547,5 +838,18 @@ seed_sets:
         let log = test_logger();
         let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
         executor.execute(&plan).unwrap();
+
+        let db = SqliteDb::connect(db_path_str).unwrap();
+        let rows: Vec<(String, String)> = db
+            .conn
+            .prepare("SELECT key, value FROM config ORDER BY key")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0], ("enabled".to_string(), "true".to_string()));
+        assert_eq!(rows[1], ("max_retries".to_string(), "5".to_string()));
     }
 }

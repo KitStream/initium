@@ -2,7 +2,6 @@ pub mod exec;
 pub mod fetch;
 pub mod migrate;
 pub mod render;
-pub mod seed;
 pub mod wait_for;
 use crate::logging::Logger;
 use std::io::{BufRead, BufReader, Read};
