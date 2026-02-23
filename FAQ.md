@@ -280,7 +280,7 @@ A `scratch` base image contains zero OS packages, zero libraries, zero shells. T
 
 - **Zero CVEs** from base image packages — nothing to scan, nothing to patch
 - **No shell** for attackers to use if the container is compromised
-- **Tiny image** — the final image is ~10MB (just the Go binary + CA certificates)
+- **Tiny image** — the final image is ~2MB (just the Rust binary + CA certificates)
 
 The trade-off is that you cannot `kubectl exec` into the container for debugging. This is acceptable for initContainers, which run once and exit.
 
@@ -424,9 +424,9 @@ Then reference your internal registry in the pod spec. If your registry requires
 ```bash
 git clone https://github.com/KitStream/initium.git
 cd initium
-make build        # produces bin/initium
-make test         # runs all unit tests with race detector
-make lint         # runs go vet + staticcheck
+make build        # produces target/release/initium
+make test         # runs all unit tests
+make lint         # runs cargo clippy + cargo fmt --check
 ```
 
 ### How do I build a custom Docker image?

@@ -7,16 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Complete rewrite from Go to Rust for ~76% smaller Docker images (7.4MB → 1.8MB)
+- CLI framework changed from cobra to clap
+- Template engine changed from Go text/template to minijinja (Jinja2-style); access env vars via `{{ env.VAR }}`
+- CI/CD workflows updated for Rust toolchain (cargo test, clippy, rustfmt)
+- Dockerfiles updated to use rust:1.85-alpine builder with musl static linking
+
 ### Added
 - `exec` subcommand: run arbitrary commands with structured logging, exit code forwarding, and optional `--workdir` for child process working directory
 - `jyq.Dockerfile` and `initium-jyq` container image variant with pre-built `jq` and `yq` tools
 - Documentation for building custom images using Initium as a base
 - `fetch` subcommand and `internal/fetch` package: fetch secrets/config from HTTP(S) endpoints with auth header via env var, retry with backoff, TLS options, redirect control (same-site by default), and path traversal prevention
-- `render` subcommand and `internal/render` package: render templates into config files with `envsubst` (default) and Go `text/template` modes, path traversal prevention, and automatic intermediate directory creation
+- `render` subcommand and `internal/render` package: render templates into config files with `envsubst` (default) and Jinja2 template modes, path traversal prevention, and automatic intermediate directory creation
 - `seed` subcommand: run database seed commands with structured logging and exit code forwarding (no idempotency — distinct from `migrate`)
 - `migrate` subcommand: run database migration commands with structured logging, exit code forwarding, and optional idempotency via `--lock-file`
 - FAQ.md with functionality, security, and deployment questions for junior-to-mid-level engineers
-- Project scaffolding with Go module, CLI framework (cobra), and repo layout
+- Project scaffolding with Rust/Cargo, CLI framework (clap), and repo layout
 - `wait-for` subcommand: wait for TCP and HTTP(S) endpoints with retries, exponential backoff, and jitter
 - `internal/retry` package with configurable retry logic, backoff, and jitter
 - `internal/logging` package with text and JSON structured logging, automatic secret redaction

@@ -161,7 +161,7 @@ Render a template file into a config file using environment variable substitutio
 Two modes are supported:
 
 - **envsubst** (default) — replaces `${VAR}` and `$VAR` patterns with environment variable values. Missing variables are left as-is.
-- **gotemplate** — full Go `text/template` support with environment variables as `.VarName`. Missing variables produce empty strings.
+- **gotemplate** — Jinja2-style templates via minijinja with environment variables accessible as `{{ env.VAR }}`. Missing variables produce empty strings.
 
 Output files are written relative to `--workdir` with path traversal prevention. Intermediate directories are created automatically.
 
@@ -169,7 +169,7 @@ Output files are written relative to `--workdir` with path traversal prevention.
 # envsubst mode (default)
 initium render --template /templates/app.conf.tmpl --output app.conf
 
-# Go template mode
+# Jinja2 template mode
 initium render --mode gotemplate --template /templates/app.conf.tmpl --output app.conf
 
 # Custom workdir
