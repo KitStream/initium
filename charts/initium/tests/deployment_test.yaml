@@ -1,0 +1,265 @@
+suite: deployment template tests
+templates:
+  - templates/deployment.yaml
+tests:
+  - it: should not render any resources when sampleDeployment is disabled
+    set:
+      sampleDeployment:
+        enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render a Deployment when sampleDeployment is enabled
+    set:
+      sampleDeployment:
+        enabled: true
+        name: test-app
+        replicas: 2
+        mainContainer:
+          image: nginx:1.27-alpine
+          port: 80
+      initContainers:
+        - name: wait-for-db
+          command:
+            - wait-for
+          args:
+            - --target
+            - tcp://postgres:5432
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: test-app
+      - equal:
+          path: spec.replicas
+          value: 2
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: wait-for-db
+      - equal:
+          path: spec.template.spec.initContainers[0].command
+          value:
+            - wait-for
+      - equal:
+          path: spec.template.spec.initContainers[0].args
+          value:
+            - --target
+            - tcp://postgres:5432
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: nginx:1.27-alpine
+
+  - it: should always apply securityContext to initContainers
+    set:
+      sampleDeployment:
+        enabled: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+      initContainers:
+        - name: init-one
+          command:
+            - wait-for
+          args:
+            - --target
+            - tcp://db:5432
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.runAsUser
+          value: 65534
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.capabilities.drop
+          value:
+            - ALL
+
+  - it: should render multiple initContainers correctly
+    set:
+      sampleDeployment:
+        enabled: true
+      initContainers:
+        - name: wait-for-db
+          command:
+            - wait-for
+          args:
+            - --target
+            - tcp://postgres:5432
+        - name: run-migration
+          command:
+            - migrate
+          args:
+            - --
+            - flyway
+            - migrate
+          env:
+            - name: FLYWAY_URL
+              value: "jdbc:postgresql://postgres:5432/mydb"
+        - name: seed-data
+          command:
+            - seed
+          args:
+            - --spec
+            - /seeds/seed.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: wait-for-db
+      - equal:
+          path: spec.template.spec.initContainers[1].name
+          value: run-migration
+      - equal:
+          path: spec.template.spec.initContainers[1].env[0].name
+          value: FLYWAY_URL
+      - equal:
+          path: spec.template.spec.initContainers[2].name
+          value: seed-data
+      - equal:
+          path: spec.template.spec.initContainers[2].args
+          value:
+            - --spec
+            - /seeds/seed.yaml
+
+  - it: should include extraVolumes and extraVolumeMounts
+    set:
+      sampleDeployment:
+        enabled: true
+      initContainers:
+        - name: render-config
+          command:
+            - render
+          args:
+            - --template
+            - /templates/app.conf.tmpl
+            - --output
+            - app.conf
+      extraVolumes:
+        - name: templates
+          configMap:
+            name: app-templates
+        - name: secrets
+          secret:
+            secretName: app-secrets
+      extraVolumeMounts:
+        - name: templates
+          mountPath: /templates
+          readOnly: true
+        - name: secrets
+          mountPath: /secrets
+          readOnly: true
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: templates
+            configMap:
+              name: app-templates
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: secrets
+            secret:
+              secretName: app-secrets
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content:
+            name: templates
+            mountPath: /templates
+            readOnly: true
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content:
+            name: secrets
+            mountPath: /secrets
+            readOnly: true
+
+  - it: should use the correct image repository and tag
+    set:
+      sampleDeployment:
+        enabled: true
+      image:
+        repository: ghcr.io/kitstream/initium
+        tag: "1.2.3"
+        pullPolicy: Always
+      initContainers:
+        - name: wait
+          command:
+            - wait-for
+          args:
+            - --target
+            - tcp://db:5432
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: "ghcr.io/kitstream/initium:1.2.3"
+      - equal:
+          path: spec.template.spec.initContainers[0].imagePullPolicy
+          value: Always
+
+  - it: should include workdir volume mount on all initContainers
+    set:
+      sampleDeployment:
+        enabled: true
+      workdir: /custom-work
+      initContainers:
+        - name: init-one
+          command:
+            - wait-for
+          args:
+            - --target
+            - tcp://db:5432
+        - name: init-two
+          command:
+            - exec
+          args:
+            - --
+            - echo
+            - hello
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content:
+            name: workdir
+            mountPath: /custom-work
+      - contains:
+          path: spec.template.spec.initContainers[1].volumeMounts
+          content:
+            name: workdir
+            mountPath: /custom-work
+
+  - it: should include standard labels on the deployment
+    set:
+      sampleDeployment:
+        enabled: true
+        name: labeled-app
+      initContainers:
+        - name: wait
+          command:
+            - wait-for
+          args:
+            - --target
+            - tcp://db:5432
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: labeled-app
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: Helm
+      - isNotEmpty:
+          path: metadata.labels["helm.sh/chart"]
