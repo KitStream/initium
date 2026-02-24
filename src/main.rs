@@ -3,6 +3,7 @@ mod logging;
 mod render;
 mod retry;
 mod safety;
+mod seed;
 
 use clap::{Parser, Subcommand};
 use std::time::Duration;
@@ -62,10 +63,12 @@ enum Commands {
         args: Vec<String>,
     },
 
-    /// Run a database seed command with structured logging
+    /// Apply structured database seeds from a YAML/JSON spec file
     Seed {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
+        #[arg(long, help = "Path to seed spec file (YAML or JSON)")]
+        spec: String,
+        #[arg(long, help = "Reset mode: delete existing data before re-seeding")]
+        reset: bool,
     },
 
     /// Render templates into config files
@@ -167,7 +170,7 @@ fn main() {
             lock_file,
             args,
         } => cmd::migrate::run(&log, &args, &workdir, &lock_file),
-        Commands::Seed { args } => cmd::seed::run(&log, &args),
+        Commands::Seed { spec, reset } => seed::run(&log, &spec, reset),
         Commands::Render {
             template,
             output,

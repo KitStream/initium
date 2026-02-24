@@ -115,44 +115,50 @@ initium migrate --lock-file .migrated --workdir /work -- /app/migrate up
 
 ### seed
 
-Run a database seed command with structured logging and exit code forwarding.
+Apply structured database seeds from a YAML or JSON spec file.
 
-The command is executed directly via `execve` (no shell). Use `--` to separate
-initium flags from the seed command and its arguments.
-
-Unlike `migrate`, `seed` has no idempotency hints — it is the caller's
-responsibility to ensure seed operations are safe to repeat or are only run once.
+The `seed` subcommand reads a declarative seed plan, connects to the target database,
+and applies data with full idempotency via a tracking table and unique key detection.
+Supports PostgreSQL, MySQL, and SQLite.
 
 ```bash
-# Seed from a SQL file
-initium seed -- psql -f /seeds/data.sql
+# Apply seeds from a YAML spec
+initium seed --spec /seeds/seed.yaml
 
-# Seed with a custom script
-initium seed -- /app/seed --file /seeds/data.sql
+# Reset and re-apply (deletes existing seeded data first)
+initium seed --spec /seeds/seed.yaml --reset
 
-# Seed with JSON logs
-initium seed --json -- python3 /scripts/seed.py
+# With JSON logs
+initium seed --spec /seeds/seed.yaml --json
 ```
 
 **Flags:**
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--spec` | _(required)_ | Path to seed spec file (YAML or JSON) |
+| `--reset` | `false` | Delete existing data and re-apply seeds |
 | `--json` | `false` | Enable JSON log output |
 
 **Behavior:**
 
-- stdout and stderr from the seed command are captured and logged with timestamps
-- The child process exit code is forwarded: a non-zero exit code causes `seed` to fail
-- No shell is used: the command is executed directly via `execve`
+- Reads a YAML/JSON seed spec defining seed sets, tables, rows, and ordering
+- Creates a tracking table (default: `initium_seed`) to record applied seed sets
+- Skips already-applied seed sets unless `--reset` is used
+- Supports unique key detection to prevent duplicate row insertion
+- Supports auto-generated IDs and cross-table references via `_ref` / `@ref:`
+- Supports environment variable substitution via `$env:VAR_NAME`
+- Each seed set is applied in a transaction; failures trigger rollback
+- In reset mode, tables are deleted in reverse order to respect foreign keys
 
 **Exit codes:**
 
 | Code | Meaning |
 |------|---------|
-| `0` | Seed succeeded |
-| `1` | Seed command failed, or invalid arguments |
-| _N_ | Forwarded from the seed command |
+| `0` | Seed plan applied successfully |
+| `1` | Invalid spec, database error, or missing references |
+
+See [seeding.md](seeding.md) for the full schema reference, features, and Kubernetes examples.
 
 ### render
 

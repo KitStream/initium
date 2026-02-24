@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Seed executor tests now verify data actually arrived in the database after execution, using file-based SQLite and post-execution queries to assert row counts, column values, cross-table references, env substitution, ordering, and edge cases
+
+### Fixed
+- Fixed clippy `collapsible_if` lint in seed executor's unique key check
+- Removed dead code: unused `src/cmd/seed.rs` module (replaced by `src/seed/`)
+- Suppressed unused field warning on `AutoIdConfig.id_type` (reserved for future use)
+- Removed unused imports (`Arc`, `Mutex`) and unused mutable binding in seed executor tests
+
+### Added
+- Structured database seeding via `seed` subcommand with YAML/JSON spec files
+- Seed tracking table (`initium_seed` by default) for idempotent seed application
+- Support for PostgreSQL, MySQL, and SQLite database drivers
+- Auto-generated IDs and cross-table references via `_ref` / `@ref:` syntax
+- Environment variable substitution in seed values via `$env:VAR_NAME`
+- Unique key detection to prevent duplicate row insertion
+- Reset mode (`--reset`) to delete existing data and re-apply seeds
+- Transaction safety: each seed set is applied atomically with rollback on failure
+- Ordered seed sets and tables via `order` field
+- Documentation: `docs/seeding.md` with full schema reference, Kubernetes usage (env vars and volume-mounted secrets), and failure modes
+- Example seed specs: `examples/seed/basic-seed.yaml`, `examples/seed/sqlite-seed.yaml`, `examples/seed/env-credentials-seed.yaml`
+- Unit tests for seed schema parsing, database operations, executor logic, references, idempotency, reset, and edge cases
+
+### Changed
 - Complete rewrite from Go to Rust for ~76% smaller Docker images (7.4MB → 1.8MB)
 - CLI framework changed from cobra to clap
 - Template engine changed from Go text/template to minijinja (Jinja2-style); access env vars via `{{ env.VAR }}`

@@ -1,0 +1,236 @@
+# Structured Database Seeding
+
+Initium's `seed` subcommand applies structured, repeatable data provisioning to your database from YAML or JSON seed spec files. It replaces ad-hoc shell scripts with a declarative approach that supports idempotency, referential integrity, and a tracking table to prevent duplicate application.
+
+## Supported Databases
+
+| Driver     | Connection URL format                          |
+|------------|------------------------------------------------|
+| `postgres` | `postgres://user:pass@host:5432/dbname`        |
+| `mysql`    | `mysql://user:pass@host:3306/dbname`           |
+| `sqlite`   | `/path/to/database.db` or `:memory:` for tests |
+
+## Quick Start
+
+```bash
+# Apply seeds from a YAML spec file
+initium seed --spec /seeds/seed.yaml
+
+# Apply seeds with reset (delete + re-seed)
+initium seed --spec /seeds/seed.yaml --reset
+
+# With JSON log output
+initium seed --spec /seeds/seed.yaml --json
+```
+
+## Seed Spec Schema
+
+The seed spec file defines the complete seeding plan. Both YAML and JSON formats are supported (file extension determines parser).
+
+### Schema version 1
+
+```yaml
+version: "1"                     # Required. Schema version.
+
+database:
+  driver: postgres               # Required. One of: postgres, mysql, sqlite
+  url: "postgres://..."          # Direct database URL
+  url_env: DATABASE_URL          # Or: name of env var containing the URL
+  tracking_table: initium_seed   # Default: "initium_seed"
+
+seed_sets:
+  - name: my_seed_set            # Required. Unique name for tracking.
+    order: 1                     # Optional. Controls execution order across seed sets.
+    tables:
+      - table: my_table          # Required. Target table name.
+        order: 1                 # Optional. Controls execution order within a seed set.
+        unique_key: [email]      # Optional. Columns used for duplicate detection.
+        auto_id:                 # Optional. Auto-generated ID configuration.
+          column: id             # Column name for the auto-generated ID.
+          id_type: integer       # ID type (default: integer).
+        rows:
+          - _ref: row_alias      # Optional. Internal reference name for this row.
+            column1: value1
+            column2: value2
+```
+
+### Field reference
+
+| Field                                  | Type     | Required | Description                                               |
+|----------------------------------------|----------|----------|-----------------------------------------------------------|
+| `version`                              | string   | Yes      | Must be `"1"`                                             |
+| `database.driver`                      | string   | Yes      | Database driver: `postgres`, `mysql`, or `sqlite`         |
+| `database.url`                         | string   | No       | Direct database connection URL                            |
+| `database.url_env`                     | string   | No       | Environment variable containing the database URL          |
+| `database.tracking_table`              | string   | No       | Name of the seed tracking table (default: `initium_seed`) |
+| `seed_sets[].name`                     | string   | Yes      | Unique name for the seed set (used in tracking)           |
+| `seed_sets[].order`                    | integer  | No       | Execution order (lower values first, default: 0)          |
+| `seed_sets[].tables[].table`           | string   | Yes      | Target database table name                                |
+| `seed_sets[].tables[].order`           | integer  | No       | Execution order within the seed set (default: 0)          |
+| `seed_sets[].tables[].unique_key`      | string[] | No       | Columns for duplicate detection                           |
+| `seed_sets[].tables[].auto_id.column`  | string   | No       | Auto-generated ID column name                             |
+| `seed_sets[].tables[].auto_id.id_type` | string   | No       | ID type (default: `integer`)                              |
+| `seed_sets[].tables[].rows[]._ref`     | string   | No       | Internal reference name for cross-table references        |
+
+### Database URL resolution
+
+The database URL is resolved in this order:
+
+1. `database.url_env` — environment variable name containing the URL
+2. `database.url` — direct URL in the spec file
+3. `DATABASE_URL` — fallback environment variable
+
+## Features
+
+### Idempotency via Tracking Table
+
+Initium creates a tracking table (default: `initium_seed`) that records which seed sets have been applied. On subsequent runs, already-applied seed sets are skipped automatically.
+
+```
+┌──────────────────────────────────────┐
+│           initium_seed               │
+├──────────┬───────────────────────────┤
+│ seed_set │ applied_at                │
+├──────────┼───────────────────────────┤
+│ users    │ 2025-01-15T10:30:00Z      │
+│ config   │ 2025-01-15T10:30:01Z      │
+└──────────┴───────────────────────────┘
+```
+
+### Duplicate Detection via Unique Keys
+
+When `unique_key` is specified on a table, each row is checked against existing data before insertion. Rows matching the unique key are skipped, preventing duplicate inserts even within the same seed set.
+
+```yaml
+tables:
+  - table: users
+    unique_key: [email]
+    rows:
+      - name: Alice
+        email: alice@example.com    # Skipped if email already exists
+```
+
+### Auto-Generated IDs and Cross-Table References
+
+Use `auto_id` to let the database generate IDs, and `_ref` + `@ref:` to reference generated values in other tables:
+
+```yaml
+seed_sets:
+  - name: with_refs
+    tables:
+      - table: departments
+        order: 1
+        auto_id:
+          column: id
+        rows:
+          - _ref: dept_eng            # Name this row for later reference
+            name: Engineering
+
+      - table: employees
+        order: 2
+        rows:
+          - name: Alice
+            email: alice@example.com
+            department_id: "@ref:dept_eng.id"   # Resolves to the generated ID
+```
+
+### Environment Variable Substitution
+
+Use `$env:VAR_NAME` to inject values from environment variables at runtime. This is ideal for credentials loaded from Kubernetes secrets:
+
+```yaml
+rows:
+  - username: "$env:ADMIN_USERNAME"
+    password_hash: "$env:ADMIN_PASSWORD_HASH"
+```
+
+### Reset Mode
+
+Use `--reset` to delete all data from seeded tables and remove tracking entries before re-applying. Tables are deleted in reverse order to respect foreign key constraints:
+
+```bash
+initium seed --spec /seeds/seed.yaml --reset
+```
+
+### Ordering
+
+Both seed sets and tables within seed sets support explicit ordering via the `order` field. Lower values execute first (default: 0). This ensures parent tables are seeded before dependent tables.
+
+### Transaction Safety
+
+Each seed set is applied within a database transaction. If any row fails to insert, the entire seed set is rolled back, preventing partial data application.
+
+## Kubernetes Usage
+
+### Credentials via Environment Variables (from Secrets)
+
+```yaml
+apiVersion: v1
+kind: Pod
+spec:
+  initContainers:
+    - name: seed-data
+      image: ghcr.io/kitstream/initium:latest
+      args: ["seed", "--spec", "/seeds/seed.yaml"]
+      env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: url
+        - name: ADMIN_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: admin-credentials
+              key: username
+        - name: ADMIN_PASSWORD_HASH
+          valueFrom:
+            secretKeyRef:
+              name: admin-credentials
+              key: password-hash
+      volumeMounts:
+        - name: seed-specs
+          mountPath: /seeds
+          readOnly: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: [ALL]
+  volumes:
+    - name: seed-specs
+      configMap:
+        name: seed-specs
+```
+
+## CLI Reference
+
+| Flag      | Default    | Description |
+|-----------|------------|-------------|
+| `--spec`  | (required) | Path to seed spec file (YAML or JSON) |
+| `--reset` | `false`    | Delete existing data and re-apply seeds |
+| `--json`  | `false`    | Enable JSON log output |
+
+## Failure Modes
+
+| Scenario                        | Behavior                                               |
+|---------------------------------|--------------------------------------------------------|
+| Invalid spec file               | Fails with parse error before connecting to database   |
+| Database unreachable            | Fails with connection error                            |
+| Unsupported driver              | Fails with descriptive error listing supported drivers |
+| Missing env var for URL         | Fails with error naming the missing variable           |
+| Missing env var in `$env:`      | Fails with error naming the missing variable           |
+| Unresolved `@ref:`              | Fails with error naming the missing reference          |
+| Row insertion failure           | Entire seed set rolled back via transaction            |
+| Duplicate row (with unique_key) | Row silently skipped                                   |
+| Already-applied seed set        | Seed set silently skipped                              |
+
+## Examples
+
+See the [`examples/seed/`](../examples/seed/) directory:
+
+- [`basic-seed.yaml`](../examples/seed/basic-seed.yaml) — PostgreSQL with departments and employees, cross-table references
+- [`sqlite-seed.yaml`](../examples/seed/sqlite-seed.yaml) — SQLite configuration table seeding
+- [`env-credentials-seed.yaml`](../examples/seed/env-credentials-seed.yaml) — MySQL with credentials from Kubernetes secrets

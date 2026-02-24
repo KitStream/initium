@@ -53,11 +53,11 @@ kubectl apply -f https://raw.githubusercontent.com/kitstream/initium/main/exampl
 | Command | Description | Status |
 |---------|-------------|--------|
 | `wait-for` | Wait for TCP/HTTP/HTTPS endpoints | ✅ Available |
-| `migrate` | Run database migrations | 🔜 Coming soon |
-| `seed` | Run database seed commands | 🔜 Coming soon |
-| `render` | Render config templates | 🔜 Coming soon |
-| `fetch` | Fetch secrets/config from HTTP | 🔜 Coming soon |
-| `exec` | Run commands with structured logging | 🔜 Coming soon |
+| `migrate` | Run database migrations | ✅ Available |
+| `seed` | Structured database seeding from YAML/JSON | ✅ Available |
+| `render` | Render config templates | ✅ Available |
+| `fetch` | Fetch secrets/config from HTTP | ✅ Available |
+| `exec` | Run commands with structured logging | ✅ Available |
 
 ### wait-for
 
@@ -137,20 +137,26 @@ args:
 
 ### How do I seed data?
 
-Use the `seed` subcommand to run your seeding tool:
+Use the `seed` subcommand with a YAML/JSON spec file that defines your seed data declaratively:
 
 ```yaml
 initContainers:
   - name: seed-data
     image: ghcr.io/kitstream/initium:latest
-    args: ["seed", "--", "/app/seed", "--file", "/seeds/initial.sql"]
+    args: ["seed", "--spec", "/seeds/seed.yaml"]
     env:
       - name: DATABASE_URL
         valueFrom:
           secretKeyRef:
             name: db-credentials
             key: url
+    volumeMounts:
+      - name: seed-specs
+        mountPath: /seeds
+        readOnly: true
 ```
+
+See [docs/seeding.md](docs/seeding.md) for the full schema, features, and examples.
 
 ### How do I run database migrations?
 
