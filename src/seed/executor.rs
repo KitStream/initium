@@ -76,7 +76,11 @@ impl<'a> SeedExecutor<'a> {
         }
 
         let mut seed_sets: Vec<&SeedSet> = phase.seed_sets.iter().collect();
-        seed_sets.sort_by_key(|s| s.order);
+        if self.reset {
+            seed_sets.sort_by_key(|s| std::cmp::Reverse(s.order));
+        } else {
+            seed_sets.sort_by_key(|s| s.order);
+        }
         for ss in &seed_sets {
             self.execute_seed_set(ss)?;
         }
