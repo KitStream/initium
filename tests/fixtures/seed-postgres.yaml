@@ -1,0 +1,36 @@
+database:
+  driver: postgres
+  url_env: POSTGRES_URL
+  tracking_table: initium_seed
+
+phases:
+  - name: setup
+    order: 1
+    seed_sets:
+      - name: departments
+        order: 1
+        tables:
+          - table: departments
+            unique_key: [name]
+            auto_id:
+              column: id
+            rows:
+              - _ref: dept_eng
+                name: Engineering
+              - _ref: dept_sales
+                name: Sales
+
+      - name: employees
+        order: 2
+        tables:
+          - table: employees
+            unique_key: [email]
+            auto_id:
+              column: id
+            rows:
+              - name: Alice
+                email: alice@example.com
+                department_id: "@ref:dept_eng.id"
+              - name: Bob
+                email: bob@example.com
+                department_id: "@ref:dept_sales.id"
