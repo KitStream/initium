@@ -7,20 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- Seed schema version 1 (flat `seed_sets` without phases): all seed specs now use phase-based structure
+- `version` field from seed spec schema: no longer required or accepted
+
 ### Added
-- Seed schema version 2 with phase-based execution: ordered phases with create → wait → seed lifecycle
-- MiniJinja template rendering for seed spec files (both v1 and v2): dynamic values, conditionals, loops via `{{ env.VAR }}`
+- Seed schema with phase-based execution: ordered phases with create → wait → seed lifecycle
+- MiniJinja template rendering for seed spec files: dynamic values, conditionals, loops via `{{ env.VAR }}`
 - Embedded database/schema creation via `create_if_missing` in seed phases (PostgreSQL, MySQL)
 - Embedded wait-for logic: poll for tables, views, schemas, or databases with configurable per-phase and per-object timeouts
 - Database trait methods: `create_database`, `create_schema`, `object_exists`, `driver_name` for SQLite, PostgreSQL, MySQL
 - Cross-phase `@ref:` references: references defined in earlier phases resolve in later phases
-- Documentation: v2 schema reference, driver support tables, MiniJinja templating guide, failure modes in `docs/seeding.md`
+- Documentation: schema reference, driver support tables, MiniJinja templating guide, failure modes in `docs/seeding.md`
 - Example: `examples/seed/phased-seed.yaml` — multi-phase PostgreSQL seeding with wait-for, create-if-missing, and MiniJinja
 
 ### Changed
 - Seed executor tests now verify data actually arrived in the database after execution, using file-based SQLite and post-execution queries to assert row counts, column values, cross-table references, env substitution, ordering, and edge cases
 
 ### Fixed
+- Aligned all markdown table columns across documentation files (`FAQ.md`, `README.md`, `docs/security.md`, `docs/seeding.md`, `docs/usage.md`)
 - Fixed clippy `collapsible_if` lint in seed executor's unique key check
 - Removed dead code: unused `src/cmd/seed.rs` module (replaced by `src/seed/`)
 - Suppressed unused field warning on `AutoIdConfig.id_type` (reserved for future use)

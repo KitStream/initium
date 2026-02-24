@@ -38,26 +38,26 @@ kubectl apply -f https://raw.githubusercontent.com/kitstream/initium/main/exampl
 
 ## Why Initium?
 
-| | Bash scripts | Initium |
-|---|---|---|
-| **Retries with backoff** | DIY, error-prone | Built-in, configurable |
-| **Structured logging** | `echo` statements | JSON or text with timestamps |
-| **Security** | Runs as root, full shell | Non-root, no shell, read-only FS |
-| **Secret handling** | Easily leaked in logs | Automatic redaction |
-| **Multiple tools** | Install curl, netcat, psql… | Single 2MB image |
-| **Reproducibility** | Shell differences across distros | Single Rust binary, `FROM scratch` |
-| **Vulnerability surface** | Full OS + shell utils | Zero OS packages |
+|                           | Bash scripts                     | Initium                            |
+| ------------------------- | -------------------------------- | ---------------------------------- |
+| **Retries with backoff**  | DIY, error-prone                 | Built-in, configurable             |
+| **Structured logging**    | `echo` statements                | JSON or text with timestamps       |
+| **Security**              | Runs as root, full shell         | Non-root, no shell, read-only FS   |
+| **Secret handling**       | Easily leaked in logs            | Automatic redaction                |
+| **Multiple tools**        | Install curl, netcat, psql…      | Single 2MB image                   |
+| **Reproducibility**       | Shell differences across distros | Single Rust binary, `FROM scratch` |
+| **Vulnerability surface** | Full OS + shell utils            | Zero OS packages                   |
 
 ## Subcommands
 
-| Command | Description | Status |
-|---------|-------------|--------|
-| `wait-for` | Wait for TCP/HTTP/HTTPS endpoints | ✅ Available |
-| `migrate` | Run database migrations | ✅ Available |
-| `seed` | Structured database seeding from YAML/JSON with MiniJinja templating | ✅ Available |
-| `render` | Render config templates | ✅ Available |
-| `fetch` | Fetch secrets/config from HTTP | ✅ Available |
-| `exec` | Run commands with structured logging | ✅ Available |
+| Command    | Description                                                          | Status      |
+| ---------- | -------------------------------------------------------------------- | ----------- |
+| `wait-for` | Wait for TCP/HTTP/HTTPS endpoints                                    | ✅ Available |
+| `migrate`  | Run database migrations                                              | ✅ Available |
+| `seed`     | Structured database seeding from YAML/JSON with MiniJinja templating | ✅ Available |
+| `render`   | Render config templates                                              | ✅ Available |
+| `fetch`    | Fetch secrets/config from HTTP                                       | ✅ Available |
+| `exec`     | Run commands with structured logging                                 | ✅ Available |
 
 ### wait-for
 

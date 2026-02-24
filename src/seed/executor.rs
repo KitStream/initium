@@ -32,26 +32,13 @@ impl<'a> SeedExecutor<'a> {
         self.log.info("starting seed execution", &[]);
         self.db.ensure_tracking_table(&self.tracking_table)?;
 
-        if plan.is_v2() {
-            self.execute_v2(plan)?;
-        } else {
-            self.execute_v1(plan)?;
-        }
+        self.execute_phases(plan)?;
 
         self.log.info("seed execution completed", &[]);
         Ok(())
     }
 
-    fn execute_v1(&mut self, plan: &SeedPlan) -> Result<(), String> {
-        let mut seed_sets: Vec<&SeedSet> = plan.seed_sets.iter().collect();
-        seed_sets.sort_by_key(|s| s.order);
-        for ss in &seed_sets {
-            self.execute_seed_set(ss)?;
-        }
-        Ok(())
-    }
-
-    fn execute_v2(&mut self, plan: &SeedPlan) -> Result<(), String> {
+    fn execute_phases(&mut self, plan: &SeedPlan) -> Result<(), String> {
         let mut phases: Vec<&SeedPhase> = plan.phases.iter().collect();
         phases.sort_by_key(|p| p.order);
         for phase in &phases {
@@ -341,20 +328,21 @@ mod tests {
     #[test]
     fn test_basic_seed_execution() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: basic
-    tables:
-      - table: departments
-        unique_key: [name]
-        auto_id:
-          column: id
-        rows:
-          - name: Engineering
-          - name: Sales
+phases:
+  - name: phase1
+    seed_sets:
+      - name: basic
+        tables:
+          - table: departments
+            unique_key: [name]
+            auto_id:
+              column: id
+            rows:
+              - name: Engineering
+              - name: Sales
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -389,17 +377,18 @@ seed_sets:
     #[test]
     fn test_idempotent_seed() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: idempotent
-    tables:
-      - table: departments
-        unique_key: [name]
-        rows:
-          - name: Engineering
+phases:
+  - name: phase1
+    seed_sets:
+      - name: idempotent
+        tables:
+          - table: departments
+            unique_key: [name]
+            rows:
+              - name: Engineering
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -434,18 +423,19 @@ seed_sets:
     #[test]
     fn test_unique_key_skip_duplicates() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: dupes
-    tables:
-      - table: departments
-        unique_key: [name]
-        rows:
-          - name: Engineering
-          - name: Engineering
+phases:
+  - name: phase1
+    seed_sets:
+      - name: dupes
+        tables:
+          - table: departments
+            unique_key: [name]
+            rows:
+              - name: Engineering
+              - name: Engineering
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -476,26 +466,27 @@ seed_sets:
     #[test]
     fn test_reference_resolution() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: with_refs
-    tables:
-      - table: departments
-        order: 1
-        auto_id:
-          column: id
-        rows:
-          - _ref: dept_eng
-            name: Engineering
-      - table: employees
-        order: 2
-        rows:
-          - name: Alice
-            email: alice@example.com
-            department_id: "@ref:dept_eng.id"
+phases:
+  - name: phase1
+    seed_sets:
+      - name: with_refs
+        tables:
+          - table: departments
+            order: 1
+            auto_id:
+              column: id
+            rows:
+              - _ref: dept_eng
+                name: Engineering
+          - table: employees
+            order: 2
+            rows:
+              - name: Alice
+                email: alice@example.com
+                department_id: "@ref:dept_eng.id"
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -545,34 +536,35 @@ seed_sets:
     #[test]
     fn test_multiple_references_same_table() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: multi_refs
-    tables:
-      - table: departments
-        order: 1
-        auto_id:
-          column: id
-        rows:
-          - _ref: dept_eng
-            name: Engineering
-          - _ref: dept_sales
-            name: Sales
-      - table: employees
-        order: 2
-        rows:
-          - name: Alice
-            email: alice@example.com
-            department_id: "@ref:dept_eng.id"
-          - name: Bob
-            email: bob@example.com
-            department_id: "@ref:dept_eng.id"
-          - name: Carol
-            email: carol@example.com
-            department_id: "@ref:dept_sales.id"
+phases:
+  - name: phase1
+    seed_sets:
+      - name: multi_refs
+        tables:
+          - table: departments
+            order: 1
+            auto_id:
+              column: id
+            rows:
+              - _ref: dept_eng
+                name: Engineering
+              - _ref: dept_sales
+                name: Sales
+          - table: employees
+            order: 2
+            rows:
+              - name: Alice
+                email: alice@example.com
+                department_id: "@ref:dept_eng.id"
+              - name: Bob
+                email: bob@example.com
+                department_id: "@ref:dept_eng.id"
+              - name: Carol
+                email: carol@example.com
+                department_id: "@ref:dept_sales.id"
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -683,17 +675,18 @@ seed_sets:
     #[test]
     fn test_reset_mode() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: resetable
-    tables:
-      - table: departments
-        unique_key: [name]
-        rows:
-          - name: Engineering
+phases:
+  - name: phase1
+    seed_sets:
+      - name: resetable
+        tables:
+          - table: departments
+            unique_key: [name]
+            rows:
+              - name: Engineering
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let log = test_logger();
@@ -733,16 +726,17 @@ seed_sets:
     fn test_env_substitution() {
         std::env::set_var("TEST_SEED_DEPT_NAME", "FromEnv");
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: env_test
-    tables:
-      - table: departments
-        rows:
-          - name: "$env:TEST_SEED_DEPT_NAME"
+phases:
+  - name: phase1
+    seed_sets:
+      - name: env_test
+        tables:
+          - table: departments
+            rows:
+              - name: "$env:TEST_SEED_DEPT_NAME"
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -768,22 +762,23 @@ seed_sets:
     #[test]
     fn test_ordering() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: ordered
-    order: 1
-    tables:
-      - table: departments
-        rows:
-          - name: Dept2
-        order: 2
-      - table: departments
-        rows:
-          - name: Dept1
+phases:
+  - name: phase1
+    seed_sets:
+      - name: ordered
         order: 1
+        tables:
+          - table: departments
+            rows:
+              - name: Dept2
+            order: 2
+          - table: departments
+            rows:
+              - name: Dept1
+            order: 1
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -822,15 +817,16 @@ seed_sets:
     #[test]
     fn test_empty_rows() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: empty
-    tables:
-      - table: departments
-        rows: []
+phases:
+  - name: phase1
+    seed_sets:
+      - name: empty
+        tables:
+          - table: departments
+            rows: []
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -855,16 +851,17 @@ seed_sets:
     #[test]
     fn test_invalid_reference() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: bad_ref
-    tables:
-      - table: departments
-        rows:
-          - name: "@ref:nonexistent.id"
+phases:
+  - name: phase1
+    seed_sets:
+      - name: bad_ref
+        tables:
+          - table: departments
+            rows:
+              - name: "@ref:nonexistent.id"
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -884,19 +881,20 @@ seed_sets:
     #[test]
     fn test_numeric_and_boolean_values() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: types
-    tables:
-      - table: config
-        rows:
-          - key: max_retries
-            value: 5
-          - key: debug
-            value: true
+phases:
+  - name: phase1
+    seed_sets:
+      - name: types
+        tables:
+          - table: config
+            rows:
+              - key: max_retries
+                value: 5
+              - key: debug
+                value: true
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -932,10 +930,8 @@ seed_sets:
         assert_eq!(rows[1], ("max_retries".to_string(), "5".to_string()));
     }
 
-    // ---- v2 phase tests ----
-
     #[test]
-    fn test_v2_basic_phase_execution() {
+    fn test_basic_phase_execution() {
         let dir = tempfile::TempDir::new().unwrap();
         let db_path = dir.path().join("test.db");
         let db_path_str = db_path.to_str().unwrap();
@@ -944,7 +940,6 @@ seed_sets:
         setup_db_with_tables(&sqlite);
 
         let yaml = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"
@@ -972,7 +967,7 @@ phases:
     }
 
     #[test]
-    fn test_v2_multiple_phases() {
+    fn test_multiple_phases() {
         let dir = tempfile::TempDir::new().unwrap();
         let db_path = dir.path().join("test.db");
         let db_path_str = db_path.to_str().unwrap();
@@ -981,7 +976,6 @@ phases:
         setup_db_with_tables(&sqlite);
 
         let yaml = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"
@@ -1038,7 +1032,7 @@ phases:
     }
 
     #[test]
-    fn test_v2_wait_for_existing_table() {
+    fn test_wait_for_existing_table() {
         let dir = tempfile::TempDir::new().unwrap();
         let db_path = dir.path().join("test.db");
         let db_path_str = db_path.to_str().unwrap();
@@ -1047,7 +1041,6 @@ phases:
         setup_db_with_tables(&sqlite);
 
         let yaml = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"
@@ -1078,7 +1071,7 @@ phases:
     }
 
     #[test]
-    fn test_v2_wait_for_timeout() {
+    fn test_wait_for_timeout() {
         let dir = tempfile::TempDir::new().unwrap();
         let db_path = dir.path().join("test.db");
         let db_path_str = db_path.to_str().unwrap();
@@ -1086,7 +1079,6 @@ phases:
         let sqlite = SqliteDb::connect(db_path_str).unwrap();
 
         let yaml = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"
@@ -1112,7 +1104,7 @@ phases:
     }
 
     #[test]
-    fn test_v2_wait_for_per_object_timeout() {
+    fn test_wait_for_per_object_timeout() {
         let dir = tempfile::TempDir::new().unwrap();
         let db_path = dir.path().join("test.db");
         let db_path_str = db_path.to_str().unwrap();
@@ -1120,7 +1112,6 @@ phases:
         let sqlite = SqliteDb::connect(db_path_str).unwrap();
 
         let yaml = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"
@@ -1142,7 +1133,7 @@ phases:
     }
 
     #[test]
-    fn test_v2_create_if_missing_unsupported_on_sqlite() {
+    fn test_create_if_missing_unsupported_on_sqlite() {
         let dir = tempfile::TempDir::new().unwrap();
         let db_path = dir.path().join("test.db");
         let db_path_str = db_path.to_str().unwrap();
@@ -1150,7 +1141,6 @@ phases:
         let sqlite = SqliteDb::connect(db_path_str).unwrap();
 
         let yaml = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"
@@ -1179,7 +1169,7 @@ phases:
     }
 
     #[test]
-    fn test_v2_phase_without_seed_sets() {
+    fn test_phase_without_seed_sets() {
         let dir = tempfile::TempDir::new().unwrap();
         let db_path = dir.path().join("test.db");
         let db_path_str = db_path.to_str().unwrap();
@@ -1188,7 +1178,6 @@ phases:
         setup_db_with_tables(&sqlite);
 
         let yaml = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"
@@ -1206,7 +1195,7 @@ phases:
     }
 
     #[test]
-    fn test_v2_wait_for_view() {
+    fn test_wait_for_view() {
         let dir = tempfile::TempDir::new().unwrap();
         let db_path = dir.path().join("test.db");
         let db_path_str = db_path.to_str().unwrap();
@@ -1221,7 +1210,6 @@ phases:
             .unwrap();
 
         let yaml = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"
@@ -1239,7 +1227,7 @@ phases:
     }
 
     #[test]
-    fn test_v2_wait_for_unsupported_type_on_sqlite() {
+    fn test_wait_for_unsupported_type_on_sqlite() {
         let dir = tempfile::TempDir::new().unwrap();
         let db_path = dir.path().join("test.db");
         let db_path_str = db_path.to_str().unwrap();
@@ -1247,7 +1235,6 @@ phases:
         let sqlite = SqliteDb::connect(db_path_str).unwrap();
 
         let yaml = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"

@@ -1,18 +1,19 @@
-version: "1"
 database:
   driver: sqlite
   url: /work/app.db
   tracking_table: initium_seed
 
-seed_sets:
+phases:
   - name: config
-    tables:
-      - table: app_config
-        unique_key: [key]
-        rows:
-          - key: max_retries
-            value: "5"
-          - key: timeout_seconds
-            value: "30"
-          - key: feature_flag_beta
-            value: "true"
+    seed_sets:
+      - name: config
+        tables:
+          - table: app_config
+            unique_key: [key]
+            rows:
+              - key: max_retries
+                value: "5"
+              - key: timeout_seconds
+                value: "30"
+              - key: feature_flag_beta
+                value: "true"

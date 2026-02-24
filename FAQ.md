@@ -147,14 +147,14 @@ This is useful when you're shipping logs to a centralized system like Loki, Data
 
 All retry parameters are flags on the `wait-for` subcommand:
 
-| Flag | Default | What it does |
-|------|---------|-------------|
-| `--max-attempts` | `60` | Total number of attempts before giving up |
-| `--initial-delay` | `1s` | Delay after the first failure |
-| `--max-delay` | `30s` | Upper bound on delay between retries |
-| `--backoff-factor` | `2.0` | Multiplier applied to the delay after each attempt |
-| `--jitter` | `0.1` | Random fraction (0.0–1.0) added to each delay to prevent thundering herd |
-| `--timeout` | `5m` | Hard deadline across all targets |
+| Flag               | Default   | What it does                                                             |
+| ------------------ | --------- | ------------------------------------------------------------------------ |
+| `--max-attempts`   | `60`      | Total number of attempts before giving up                                |
+| `--initial-delay`  | `1s`      | Delay after the first failure                                            |
+| `--max-delay`      | `30s`     | Upper bound on delay between retries                                     |
+| `--backoff-factor` | `2.0`     | Multiplier applied to the delay after each attempt                       |
+| `--jitter`         | `0.1`     | Random fraction (0.0–1.0) added to each delay to prevent thundering herd |
+| `--timeout`        | `5m`      | Hard deadline across all targets                                         |
 
 Example — fast retries with low jitter:
 
@@ -449,12 +449,12 @@ kubectl logs <pod-name> -c <initcontainer-name>
 
 Common causes:
 
-| Symptom | Likely cause | Fix |
-|---------|-------------|-----|
+| Symptom                                   | Likely cause                                 | Fix                                                                          |
+| ----------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------- |
 | `target not reachable` after all attempts | Target service isn't running or DNS is wrong | Check the service/endpoint exists and is in the same namespace (or use FQDN) |
-| `unsupported target scheme` | Missing `tcp://` or `http://` prefix | Add the scheme: `tcp://postgres:5432` not just `postgres:5432` |
-| `path traversal detected` | Output path tries to escape workdir | Use a relative path for `--output` |
-| `context cancelled` | Overall `--timeout` was too short | Increase `--timeout` or check why the target takes so long |
+| `unsupported target scheme`               | Missing `tcp://` or `http://` prefix         | Add the scheme: `tcp://postgres:5432` not just `postgres:5432`               |
+| `path traversal detected`                 | Output path tries to escape workdir          | Use a relative path for `--output`                                           |
+| `context cancelled`                       | Overall `--timeout` was too short            | Increase `--timeout` or check why the target takes so long                   |
 
 ### Does Initium support ARM-based nodes (e.g., AWS Graviton)?
 

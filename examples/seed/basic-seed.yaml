@@ -1,43 +1,44 @@
-version: "1"
 database:
   driver: postgres
   url_env: DATABASE_URL
   tracking_table: initium_seed
 
-seed_sets:
-  - name: departments
-    order: 1
-    tables:
-      - table: departments
-        unique_key: [name]
-        auto_id:
-          column: id
-          id_type: integer
-        rows:
-          - _ref: dept_eng
-            name: Engineering
-          - _ref: dept_sales
-            name: Sales
-          - _ref: dept_hr
-            name: Human Resources
+phases:
+  - name: data
+    seed_sets:
+      - name: departments
+        order: 1
+        tables:
+          - table: departments
+            unique_key: [name]
+            auto_id:
+              column: id
+              id_type: integer
+            rows:
+              - _ref: dept_eng
+                name: Engineering
+              - _ref: dept_sales
+                name: Sales
+              - _ref: dept_hr
+                name: Human Resources
 
-  - name: employees
-    order: 2
-    tables:
-      - table: employees
-        unique_key: [email]
-        auto_id:
-          column: id
-        rows:
-          - name: Alice Johnson
-            email: alice@example.com
-            department_id: "@ref:dept_eng.id"
-            role: admin
-          - name: Bob Smith
-            email: bob@example.com
-            department_id: "@ref:dept_sales.id"
-            role: user
-          - name: Carol Williams
-            email: carol@example.com
-            department_id: "@ref:dept_hr.id"
-            role: user
+      - name: employees
+        order: 2
+        tables:
+          - table: employees
+            unique_key: [email]
+            auto_id:
+              column: id
+            rows:
+              - name: Alice Johnson
+                email: alice@example.com
+                department_id: "@ref:dept_eng.id"
+                role: admin
+              - name: Bob Smith
+                email: bob@example.com
+                department_id: "@ref:dept_sales.id"
+                role: user
+              - name: Carol Williams
+                email: carol@example.com
+                department_id: "@ref:dept_hr.id"
+                role: user

@@ -3,12 +3,8 @@ use std::collections::HashMap;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct SeedPlan {
-    pub version: String,
     #[serde(default)]
     pub database: DatabaseConfig,
-    #[serde(default)]
-    pub seed_sets: Vec<SeedSet>,
-    #[serde(default)]
     pub phases: Vec<SeedPhase>,
 }
 
@@ -112,34 +108,9 @@ impl SeedPlan {
         Ok(plan)
     }
 
-    pub fn is_v2(&self) -> bool {
-        self.version == "2"
-    }
-
     pub fn validate(&self) -> Result<(), String> {
-        match self.version.as_str() {
-            "1" => self.validate_v1(),
-            "2" => self.validate_v2(),
-            _ => Err(format!(
-                "unsupported seed schema version: {} (expected \"1\" or \"2\")",
-                self.version
-            )),
-        }
-    }
-
-    fn validate_v1(&self) -> Result<(), String> {
-        if self.seed_sets.is_empty() {
-            return Err("seed plan must contain at least one seed_set".into());
-        }
-        for ss in &self.seed_sets {
-            Self::validate_seed_set(ss)?;
-        }
-        Ok(())
-    }
-
-    fn validate_v2(&self) -> Result<(), String> {
         if self.phases.is_empty() {
-            return Err("v2 seed plan must contain at least one phase".into());
+            return Err("seed plan must contain at least one phase".into());
         }
         for phase in &self.phases {
             if phase.name.is_empty() {
@@ -218,49 +189,50 @@ mod tests {
     #[test]
     fn test_parse_minimal_yaml() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
+phases:
   - name: basic
-    tables:
-      - table: users
-        rows:
-          - name: alice
+    seed_sets:
+      - name: basic
+        tables:
+          - table: users
+            rows:
+              - name: alice
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        assert_eq!(plan.version, "1");
-        assert_eq!(plan.seed_sets.len(), 1);
-        assert_eq!(plan.seed_sets[0].tables[0].table, "users");
+        assert_eq!(plan.phases.len(), 1);
+        assert_eq!(plan.phases[0].seed_sets[0].tables[0].table, "users");
     }
 
     #[test]
     fn test_parse_with_auto_id_and_unique_key() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
   tracking_table: my_seeds
-seed_sets:
-  - name: accounts
-    order: 1
-    tables:
-      - table: accounts
+phases:
+  - name: accounts_phase
+    seed_sets:
+      - name: accounts
         order: 1
-        unique_key: [email]
-        auto_id:
-          column: id
-          id_type: integer
-        rows:
-          - email: alice@example.com
-            role: admin
-          - email: bob@example.com
-            role: user
+        tables:
+          - table: accounts
+            order: 1
+            unique_key: [email]
+            auto_id:
+              column: id
+              id_type: integer
+            rows:
+              - email: alice@example.com
+                role: admin
+              - email: bob@example.com
+                role: user
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        let ts = &plan.seed_sets[0].tables[0];
+        let ts = &plan.phases[0].seed_sets[0].tables[0];
         assert_eq!(ts.unique_key, vec!["email"]);
         assert!(ts.auto_id.is_some());
         assert_eq!(ts.auto_id.as_ref().unwrap().column, "id");
@@ -271,40 +243,29 @@ seed_sets:
     #[test]
     fn test_parse_json() {
         let json = r#"{
-  "version": "1",
   "database": {"driver": "sqlite", "url": ":memory:"},
-  "seed_sets": [
+  "phases": [
     {
-      "name": "test",
-      "tables": [
-        {"table": "items", "rows": [{"name": "thing"}]}
+      "name": "phase1",
+      "seed_sets": [
+        {
+          "name": "test",
+          "tables": [
+            {"table": "items", "rows": [{"name": "thing"}]}
+          ]
+        }
       ]
     }
   ]
 }"#;
         let plan = SeedPlan::from_json(json).unwrap();
-        assert_eq!(plan.seed_sets[0].name, "test");
+        assert_eq!(plan.phases[0].seed_sets[0].name, "test");
     }
 
     #[test]
-    fn test_invalid_version() {
+    fn test_empty_phases() {
         let yaml = r#"
-version: "3"
-seed_sets:
-  - name: x
-    tables:
-      - table: t
-        rows: []
-"#;
-        let err = SeedPlan::from_yaml(yaml).unwrap_err();
-        assert!(err.contains("unsupported seed schema version"));
-    }
-
-    #[test]
-    fn test_empty_seed_sets() {
-        let yaml = r#"
-version: "1"
-seed_sets: []
+phases: []
 "#;
         assert!(SeedPlan::from_yaml(yaml).is_err());
     }
@@ -312,12 +273,13 @@ seed_sets: []
     #[test]
     fn test_empty_table_name() {
         let yaml = r#"
-version: "1"
-seed_sets:
-  - name: x
-    tables:
-      - table: ""
-        rows: []
+phases:
+  - name: phase1
+    seed_sets:
+      - name: x
+        tables:
+          - table: ""
+            rows: []
 "#;
         assert!(SeedPlan::from_yaml(yaml).is_err());
     }
@@ -325,15 +287,16 @@ seed_sets:
     #[test]
     fn test_resolve_url_from_config() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: "test.db"
-seed_sets:
-  - name: x
-    tables:
-      - table: t
-        rows: []
+phases:
+  - name: phase1
+    seed_sets:
+      - name: x
+        tables:
+          - table: t
+            rows: []
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         assert_eq!(plan.resolve_db_url().unwrap(), "test.db");
@@ -343,15 +306,16 @@ seed_sets:
     fn test_resolve_url_from_env() {
         std::env::set_var("TEST_SEED_DB_URL", "postgres://localhost/test");
         let yaml = r#"
-version: "1"
 database:
   driver: postgres
   url_env: TEST_SEED_DB_URL
-seed_sets:
-  - name: x
-    tables:
-      - table: t
-        rows: []
+phases:
+  - name: phase1
+    seed_sets:
+      - name: x
+        tables:
+          - table: t
+            rows: []
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         assert_eq!(plan.resolve_db_url().unwrap(), "postgres://localhost/test");
@@ -361,15 +325,16 @@ seed_sets:
     #[test]
     fn test_default_tracking_table() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: x
-    tables:
-      - table: t
-        rows: []
+phases:
+  - name: phase1
+    seed_sets:
+      - name: x
+        tables:
+          - table: t
+            rows: []
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         assert_eq!(plan.database.tracking_table, "initium_seed");
@@ -378,34 +343,34 @@ seed_sets:
     #[test]
     fn test_references_in_values() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: refs
-    tables:
-      - table: departments
-        auto_id:
-          column: id
-        rows:
-          - _ref: dept_eng
-            name: Engineering
-      - table: employees
-        rows:
-          - name: Alice
-            department_id: "@ref:dept_eng.id"
+phases:
+  - name: phase1
+    seed_sets:
+      - name: refs
+        tables:
+          - table: departments
+            auto_id:
+              column: id
+            rows:
+              - _ref: dept_eng
+                name: Engineering
+          - table: employees
+            rows:
+              - name: Alice
+                department_id: "@ref:dept_eng.id"
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        let emp_rows = &plan.seed_sets[0].tables[1].rows;
+        let emp_rows = &plan.phases[0].seed_sets[0].tables[1].rows;
         let dept_id = emp_rows[0].get("department_id").unwrap();
         assert_eq!(dept_id.as_str().unwrap(), "@ref:dept_eng.id");
     }
 
     #[test]
-    fn test_parse_v2_phases() {
+    fn test_parse_phases() {
         let yaml = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"
@@ -425,7 +390,6 @@ phases:
                 value: test
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        assert!(plan.is_v2());
         assert_eq!(plan.phases.len(), 1);
         assert_eq!(plan.phases[0].name, "setup");
         assert!(plan.phases[0].create_if_missing);
@@ -437,9 +401,8 @@ phases:
     }
 
     #[test]
-    fn test_v2_empty_phases() {
+    fn test_empty_phases_error() {
         let yaml = r#"
-version: "2"
 phases: []
 "#;
         let err = SeedPlan::from_yaml(yaml).unwrap_err();
@@ -447,9 +410,8 @@ phases: []
     }
 
     #[test]
-    fn test_v2_empty_phase_name() {
+    fn test_empty_phase_name() {
         let yaml = r#"
-version: "2"
 phases:
   - name: ""
     seed_sets:
@@ -463,9 +425,8 @@ phases:
     }
 
     #[test]
-    fn test_v2_invalid_wait_for_type() {
+    fn test_invalid_wait_for_type() {
         let yaml = r#"
-version: "2"
 phases:
   - name: setup
     wait_for:
@@ -477,9 +438,8 @@ phases:
     }
 
     #[test]
-    fn test_v2_empty_wait_for_name() {
+    fn test_empty_wait_for_name() {
         let yaml = r#"
-version: "2"
 phases:
   - name: setup
     wait_for:
@@ -491,9 +451,8 @@ phases:
     }
 
     #[test]
-    fn test_v2_multiple_phases() {
+    fn test_multiple_phases() {
         let yaml = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"
@@ -531,9 +490,8 @@ phases:
     }
 
     #[test]
-    fn test_v2_default_timeout() {
+    fn test_default_timeout() {
         let yaml = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"
@@ -551,9 +509,8 @@ phases:
     }
 
     #[test]
-    fn test_v2_wait_for_with_per_object_timeout() {
+    fn test_wait_for_with_per_object_timeout() {
         let yaml = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"
@@ -580,9 +537,8 @@ phases:
     }
 
     #[test]
-    fn test_v2_phase_without_seed_sets() {
+    fn test_phase_without_seed_sets() {
         let yaml = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"

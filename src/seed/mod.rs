@@ -34,13 +34,7 @@ pub fn run(log: &Logger, spec_file: &str, reset: bool) -> Result<(), String> {
     let tracking_table = plan.database.tracking_table.clone();
     let driver = plan.database.driver.clone();
 
-    log.info(
-        "connecting to database",
-        &[
-            ("driver", driver.as_str()),
-            ("version", plan.version.as_str()),
-        ],
-    );
+    log.info("connecting to database", &[("driver", driver.as_str())]);
 
     let db = db::connect(&driver, &db_url)?;
     let mut exec = executor::SeedExecutor::new(log, db, tracking_table, reset);
@@ -54,7 +48,6 @@ mod tests {
     #[test]
     fn test_render_template_plain_yaml() {
         let input = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"
@@ -68,7 +61,6 @@ phases:
               - a: b
 "#;
         let rendered = render_template(input).unwrap();
-        assert!(rendered.contains("version: \"2\""));
         assert!(rendered.contains("phases:"));
     }
 
@@ -76,7 +68,6 @@ phases:
     fn test_render_template_with_env() {
         std::env::set_var("TEST_SEED_RENDER_DRIVER", "sqlite");
         let input = r#"
-version: "2"
 database:
   driver: {{ env.TEST_SEED_RENDER_DRIVER }}
   url: ":memory:"
@@ -98,7 +89,6 @@ phases:
     fn test_render_template_with_conditional() {
         std::env::set_var("TEST_SEED_ENABLE_PHASE2", "yes");
         let input = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"
@@ -128,7 +118,6 @@ phases:
     #[test]
     fn test_render_template_with_loop() {
         let input = r#"
-version: "2"
 database:
   driver: sqlite
   url: ":memory:"
@@ -160,7 +149,6 @@ phases:
     #[test]
     fn test_render_template_missing_env_lenient() {
         let input = r#"
-version: "2"
 database:
   driver: {{ env.NONEXISTENT_SEED_VAR_XYZ }}
   url: ":memory:"

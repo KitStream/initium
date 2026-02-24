@@ -44,17 +44,17 @@ initium wait-for --target https://vault:8200/v1/sys/health --insecure-tls
 
 **Flags:**
 
-| Flag | Default | Env Var | Description |
-|------|---------|---------|-------------|
-| `--target` | _(required)_ | | Target URL (`tcp://`, `http://`, `https://`) |
-| `--timeout` | `5m` | `INITIUM_TIMEOUT` | Overall timeout |
-| `--max-attempts` | `60` | `INITIUM_MAX_ATTEMPTS` | Max retry attempts |
-| `--initial-delay` | `1s` | `INITIUM_INITIAL_DELAY` | Initial retry delay |
-| `--max-delay` | `30s` | `INITIUM_MAX_DELAY` | Max retry delay |
-| `--backoff-factor` | `2.0` | `INITIUM_BACKOFF_FACTOR` | Exponential backoff multiplier |
-| `--jitter` | `0.1` | `INITIUM_JITTER` | Jitter fraction (0.0–1.0) |
-| `--http-status` | `200` | `INITIUM_HTTP_STATUS` | Expected HTTP status code |
-| `--insecure-tls` | `false` | `INITIUM_INSECURE_TLS` | Skip TLS verification |
+| Flag               | Default      | Env Var                  | Description                                  |
+| ------------------ | ------------ | ------------------------ | -------------------------------------------- |
+| `--target`         | _(required)_ |                          | Target URL (`tcp://`, `http://`, `https://`) |
+| `--timeout`        | `5m`         | `INITIUM_TIMEOUT`        | Overall timeout                              |
+| `--max-attempts`   | `60`         | `INITIUM_MAX_ATTEMPTS`   | Max retry attempts                           |
+| `--initial-delay`  | `1s`         | `INITIUM_INITIAL_DELAY`  | Initial retry delay                          |
+| `--max-delay`      | `30s`        | `INITIUM_MAX_DELAY`      | Max retry delay                              |
+| `--backoff-factor` | `2.0`        | `INITIUM_BACKOFF_FACTOR` | Exponential backoff multiplier               |
+| `--jitter`         | `0.1`        | `INITIUM_JITTER`         | Jitter fraction (0.0–1.0)                    |
+| `--http-status`    | `200`        | `INITIUM_HTTP_STATUS`    | Expected HTTP status code                    |
+| `--insecure-tls`   | `false`      | `INITIUM_INSECURE_TLS`   | Skip TLS verification                        |
 
 **Multiple targets:**
 
@@ -88,11 +88,11 @@ initium migrate --lock-file .migrated --workdir /work -- /app/migrate up
 
 **Flags:**
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--workdir` | `/work` | Working directory for file operations |
-| `--lock-file` | _(none)_ | Skip migration if this file exists in workdir (idempotency) |
-| `--json` | `false` | Enable JSON log output |
+| Flag          | Default   | Description                                                 |
+| ------------- | --------- | ----------------------------------------------------------- |
+| `--workdir`   | `/work`   | Working directory for file operations                       |
+| `--lock-file` | _(none)_  | Skip migration if this file exists in workdir (idempotency) |
+| `--json`      | `false`   | Enable JSON log output                                      |
 
 **Behavior:**
 
@@ -107,11 +107,11 @@ initium migrate --lock-file .migrated --workdir /work -- /app/migrate up
 
 **Exit codes:**
 
-| Code | Meaning |
-|------|---------|
-| `0` | Migration succeeded (or skipped via lock file) |
-| `1` | Migration command failed, or invalid arguments |
-| _N_ | Forwarded from the migration command |
+| Code   | Meaning                                        |
+| ------ | ---------------------------------------------- |
+| `0`    | Migration succeeded (or skipped via lock file) |
+| `1`    | Migration command failed, or invalid arguments |
+| _N_    | Forwarded from the migration command           |
 
 ### seed
 
@@ -134,32 +134,32 @@ initium seed --spec /seeds/seed.yaml --json
 
 **Flags:**
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--spec` | _(required)_ | Path to seed spec file (YAML or JSON) |
-| `--reset` | `false` | Delete existing data and re-apply seeds |
-| `--json` | `false` | Enable JSON log output |
+| Flag      | Default      | Description                             |
+| --------- | ------------ | --------------------------------------- |
+| `--spec`  | _(required)_ | Path to seed spec file (YAML or JSON)   |
+| `--reset` | `false`      | Delete existing data and re-apply seeds |
+| `--json`  | `false`      | Enable JSON log output                  |
 
 **Behavior:**
 
 - Seed spec files are MiniJinja templates rendered with env vars before parsing (`{{ env.VAR }}`)
-- Reads a YAML/JSON seed spec defining seed sets, tables, rows, and ordering
+- Reads a YAML/JSON seed spec defining phases, seed sets, tables, rows, and ordering
 - Creates a tracking table (default: `initium_seed`) to record applied seed sets
 - Skips already-applied seed sets unless `--reset` is used
 - Supports unique key detection to prevent duplicate row insertion
 - Supports auto-generated IDs and cross-table references via `_ref` / `@ref:`
-- Supports environment variable substitution via `$env:VAR_NAME` (v1) or MiniJinja `{{ env.VAR }}` (v2)
+- Supports environment variable substitution via `$env:VAR_NAME` or MiniJinja `{{ env.VAR }}`
 - Each seed set is applied in a transaction; failures trigger rollback
 - In reset mode, tables are deleted in reverse order to respect foreign keys
-- **v2 phases**: ordered phases with `create_if_missing` (database/schema creation), `wait_for` (poll for objects with timeout), and seed data
-- **v2 wait-for**: supports `table`, `view`, `schema`, `database` object types (driver-dependent)
+- Ordered phases with `create_if_missing` (database/schema creation), `wait_for` (poll for objects with timeout), and seed data
+- Wait-for supports `table`, `view`, `schema`, `database` object types (driver-dependent)
 
 **Exit codes:**
 
-| Code | Meaning |
-|------|---------|
-| `0` | Seed plan applied successfully |
-| `1` | Invalid spec, database error, or missing references |
+| Code   | Meaning                                             |
+| ------ | --------------------------------------------------- |
+| `0`    | Seed plan applied successfully                      |
+| `1`    | Invalid spec, database error, or missing references |
 
 See [seeding.md](seeding.md) for the full schema reference, features, and Kubernetes examples.
 
@@ -190,20 +190,20 @@ initium render --template /tpl/db.conf.tmpl --output config/db.conf --workdir /w
 
 **Flags:**
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--template` | _(required)_ | Path to template file |
-| `--output` | _(required)_ | Output file path relative to workdir |
-| `--workdir` | `/work` | Working directory for output files |
-| `--mode` | `envsubst` | Template mode: `envsubst` or `gotemplate` |
-| `--json` | `false` | Enable JSON log output |
+| Flag         | Default      | Description                               |
+| ------------ | ------------ | ----------------------------------------- |
+| `--template` | _(required)_ | Path to template file                     |
+| `--output`   | _(required)_ | Output file path relative to workdir      |
+| `--workdir`  | `/work`      | Working directory for output files        |
+| `--mode`     | `envsubst`   | Template mode: `envsubst` or `gotemplate` |
+| `--json`     | `false`      | Enable JSON log output                    |
 
 **Exit codes:**
 
-| Code | Meaning |
-|------|---------|
-| `0` | Render succeeded |
-| `1` | Invalid arguments, missing template, template syntax error, or path traversal |
+| Code   | Meaning                                                                       |
+| ------ | ----------------------------------------------------------------------------- |
+| `0`    | Render succeeded                                                              |
+| `1`    | Invalid arguments, missing template, template syntax error, or path traversal |
 
 ### fetch
 
@@ -235,22 +235,22 @@ initium fetch --url http://cdn/config --output config.json \
 
 **Flags:**
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--url` | _(required)_ | Target URL to fetch |
-| `--output` | _(required)_ | Output file path relative to workdir |
-| `--workdir` | `/work` | Working directory for output files |
-| `--auth-env` | _(none)_ | Name of env var containing the Authorization header value |
-| `--insecure-tls` | `false` | Skip TLS certificate verification |
-| `--follow-redirects` | `false` | Follow HTTP redirects |
-| `--allow-cross-site-redirects` | `false` | Allow cross-site redirects (requires `--follow-redirects`) |
-| `--timeout` | `5m` | Overall timeout |
-| `--max-attempts` | `3` | Maximum retry attempts |
-| `--initial-delay` | `1s` | Initial delay between retries |
-| `--max-delay` | `30s` | Maximum delay between retries |
-| `--backoff-factor` | `2.0` | Backoff multiplier |
-| `--jitter` | `0.1` | Jitter fraction (0.0–1.0) |
-| `--json` | `false` | Enable JSON log output |
+| Flag                           | Default      | Description                                                |
+| ------------------------------ | ------------ | ---------------------------------------------------------- |
+| `--url`                        | _(required)_ | Target URL to fetch                                        |
+| `--output`                     | _(required)_ | Output file path relative to workdir                       |
+| `--workdir`                    | `/work`      | Working directory for output files                         |
+| `--auth-env`                   | _(none)_     | Name of env var containing the Authorization header value  |
+| `--insecure-tls`               | `false`      | Skip TLS certificate verification                          |
+| `--follow-redirects`           | `false`      | Follow HTTP redirects                                      |
+| `--allow-cross-site-redirects` | `false`      | Allow cross-site redirects (requires `--follow-redirects`) |
+| `--timeout`                    | `5m`         | Overall timeout                                            |
+| `--max-attempts`               | `3`          | Maximum retry attempts                                     |
+| `--initial-delay`              | `1s`         | Initial delay between retries                              |
+| `--max-delay`                  | `30s`        | Maximum delay between retries                              |
+| `--backoff-factor`             | `2.0`        | Backoff multiplier                                         |
+| `--jitter`                     | `0.1`        | Jitter fraction (0.0–1.0)                                  |
+| `--json`                       | `false`      | Enable JSON log output                                     |
 
 **Security notes:**
 
@@ -260,10 +260,10 @@ initium fetch --url http://cdn/config --output config.json \
 
 **Exit codes:**
 
-| Code | Meaning |
-|------|---------|
-| `0` | Fetch succeeded |
-| `1` | Invalid arguments, HTTP error, timeout, or path traversal |
+| Code   | Meaning                                                   |
+| ------ | --------------------------------------------------------- |
+| `0`    | Fetch succeeded                                           |
+| `1`    | Invalid arguments, HTTP error, timeout, or path traversal |
 
 ### exec
 
@@ -292,10 +292,10 @@ initium exec --workdir /certs -- openssl genrsa -out key.pem 4096
 
 **Flags:**
 
-| Flag | Default | Description |
-|------|---------|-------------|
+| Flag        | Default     | Description                             |
+| ----------- | ----------- | --------------------------------------- |
 | `--workdir` | _(inherit)_ | Working directory for the child process |
-| `--json` | `false` | Enable JSON log output |
+| `--json`    | `false`     | Enable JSON log output                  |
 
 **Behavior:**
 
@@ -306,11 +306,11 @@ initium exec --workdir /certs -- openssl genrsa -out key.pem 4096
 
 **Exit codes:**
 
-| Code | Meaning |
-|------|---------|
-| `0` | Command succeeded |
-| `1` | Command failed, or invalid arguments |
-| _N_ | Forwarded from the command |
+| Code   | Meaning                              |
+| ------ | ------------------------------------ |
+| `0`    | Command succeeded                    |
+| `1`    | Command failed, or invalid arguments |
+| _N_    | Forwarded from the command           |
 
 ## Building Custom Images with Initium
 
@@ -364,16 +364,16 @@ initContainers:
 
 ## Global Flags
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--json` | `false` | Enable JSON-formatted log output |
+| Flag     | Default   | Description                      |
+| -------- | --------- | -------------------------------- |
+| `--json` | `false`   | Enable JSON-formatted log output |
 
 ## Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| `0` | Success |
-| `1` | General error (invalid args, timeout, unreachable target) |
+| Code   | Meaning                                                   |
+| ------ | --------------------------------------------------------- |
+| `0`    | Success                                                   |
+| `1`    | General error (invalid args, timeout, unreachable target) |
 
 ## Security Defaults
 
