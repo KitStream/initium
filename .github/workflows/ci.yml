@@ -41,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
-      - run: helm plugin install https://github.com/helm-unittest/helm-unittest.git
+      - run: helm plugin install --verify=false https://github.com/helm-unittest/helm-unittest.git --version v0.5.1
       - run: helm lint charts/initium
       - run: helm template test-release charts/initium --set sampleDeployment.enabled=true --set 'initContainers[0].name=wait' --set 'initContainers[0].command[0]=wait-for' --set 'initContainers[0].args[0]=--target' --set 'initContainers[0].args[1]=tcp://localhost:5432'
       - run: helm unittest charts/initium
