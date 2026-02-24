@@ -1,5 +1,70 @@
+use serde::de::{self, Deserializer};
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::fmt;
+
+fn deserialize_string_or_number<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct StringOrNumber;
+    impl<'de> de::Visitor<'de> for StringOrNumber {
+        type Value = String;
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a string or number")
+        }
+        fn visit_str<E: de::Error>(self, v: &str) -> Result<String, E> {
+            Ok(v.to_string())
+        }
+        fn visit_i64<E: de::Error>(self, v: i64) -> Result<String, E> {
+            Ok(v.to_string())
+        }
+        fn visit_u64<E: de::Error>(self, v: u64) -> Result<String, E> {
+            Ok(v.to_string())
+        }
+        fn visit_f64<E: de::Error>(self, v: f64) -> Result<String, E> {
+            Ok(v.to_string())
+        }
+    }
+    deserializer.deserialize_any(StringOrNumber)
+}
+
+fn deserialize_optional_string_or_number<'de, D>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct OptStringOrNumber;
+    impl<'de> de::Visitor<'de> for OptStringOrNumber {
+        type Value = Option<String>;
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a string, number, or null")
+        }
+        fn visit_none<E: de::Error>(self) -> Result<Option<String>, E> {
+            Ok(None)
+        }
+        fn visit_unit<E: de::Error>(self) -> Result<Option<String>, E> {
+            Ok(None)
+        }
+        fn visit_some<D2: Deserializer<'de>>(self, d: D2) -> Result<Option<String>, D2::Error> {
+            deserialize_string_or_number(d).map(Some)
+        }
+        fn visit_str<E: de::Error>(self, v: &str) -> Result<Option<String>, E> {
+            Ok(Some(v.to_string()))
+        }
+        fn visit_i64<E: de::Error>(self, v: i64) -> Result<Option<String>, E> {
+            Ok(Some(v.to_string()))
+        }
+        fn visit_u64<E: de::Error>(self, v: u64) -> Result<Option<String>, E> {
+            Ok(Some(v.to_string()))
+        }
+        fn visit_f64<E: de::Error>(self, v: f64) -> Result<Option<String>, E> {
+            Ok(Some(v.to_string()))
+        }
+    }
+    deserializer.deserialize_any(OptStringOrNumber)
+}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct SeedPlan {
@@ -74,14 +139,17 @@ pub struct SeedPhase {
     pub create_if_missing: bool,
     #[serde(default)]
     pub wait_for: Vec<WaitForObject>,
-    #[serde(default = "default_phase_timeout")]
-    pub timeout: u64,
+    #[serde(
+        default = "default_phase_timeout",
+        deserialize_with = "deserialize_string_or_number"
+    )]
+    pub timeout: String,
     #[serde(default)]
     pub seed_sets: Vec<SeedSet>,
 }
 
-fn default_phase_timeout() -> u64 {
-    30
+fn default_phase_timeout() -> String {
+    "30s".into()
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -89,8 +157,8 @@ pub struct WaitForObject {
     #[serde(rename = "type")]
     pub obj_type: String,
     pub name: String,
-    #[serde(default)]
-    pub timeout: Option<u64>,
+    #[serde(default, deserialize_with = "deserialize_optional_string_or_number")]
+    pub timeout: Option<String>,
 }
 
 impl SeedPlan {
@@ -396,7 +464,7 @@ phases:
         assert_eq!(plan.phases[0].wait_for.len(), 1);
         assert_eq!(plan.phases[0].wait_for[0].obj_type, "table");
         assert_eq!(plan.phases[0].wait_for[0].name, "config");
-        assert_eq!(plan.phases[0].timeout, 10);
+        assert_eq!(plan.phases[0].timeout, "10");
         assert_eq!(plan.phases[0].seed_sets.len(), 1);
     }
 
@@ -505,7 +573,7 @@ phases:
               - a: b
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        assert_eq!(plan.phases[0].timeout, 30);
+        assert_eq!(plan.phases[0].timeout, "30s");
     }
 
     #[test]
@@ -532,7 +600,7 @@ phases:
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let wf = &plan.phases[0].wait_for;
-        assert_eq!(wf[0].timeout, Some(120));
+        assert_eq!(wf[0].timeout, Some("120".to_string()));
         assert_eq!(wf[1].timeout, None);
     }
 

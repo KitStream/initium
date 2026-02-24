@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Duration unit support for all time parameters (`--timeout`, `--initial-delay`, `--max-delay`, seed phase `timeout`, seed wait-for `timeout`): accepts `ms`, `s`, `m`, `h` suffixes with decimal values (e.g. `1.5m`, `2.7s`) and combined units (e.g. `1m30s`, `2s700ms`, `18h36m4s200ms`); bare numbers default to seconds
+- `src/duration.rs` module with `parse_duration` and `format_duration` utilities
 - Environment variable support for all CLI flags via `INITIUM_*` prefix (e.g., `--json` → `INITIUM_JSON`, `--timeout` → `INITIUM_TIMEOUT`); flag values take precedence over env vars
 - Comma-separated `INITIUM_TARGET` env var for specifying multiple wait-for endpoints
 - Env var column added to all flag tables in `docs/usage.md`
@@ -19,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced Dockerfile stub-build caching layer with BuildKit `--mount=type=cache` for cargo registry and target directory, enabling cross-build cache reuse
 
 ### Changed
+- CLI time parameter defaults now use duration units: `--timeout` default `5m` (was `300`), `--initial-delay` default `1s` (was `1000`), `--max-delay` default `30s` (was `30000`); seed phase timeout default `30s` (was `30`)
 - Replaced `regex` crate with manual envsubst parser in render module for smaller binary
 - Replaced `chrono` crate with `std::time::SystemTime` and Hinnant's civil calendar algorithm in logging module
 - Switched rustls from default crypto backends (aws-lc-rs + ring) to ring-only

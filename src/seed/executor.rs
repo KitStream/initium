@@ -1,3 +1,4 @@
+use crate::duration::{format_duration, parse_duration};
 use crate::logging::Logger;
 use crate::seed::db::Database;
 use crate::seed::schema::{SeedPhase, SeedPlan, SeedSet, TableSeed, WaitForObject};
@@ -68,8 +69,10 @@ impl<'a> SeedExecutor<'a> {
             }
         }
 
+        let phase_timeout =
+            parse_duration(&phase.timeout).map_err(|e| format!("invalid phase timeout: {}", e))?;
         for wf in &phase.wait_for {
-            self.wait_for_object(wf, phase.timeout)?;
+            self.wait_for_object(wf, &phase_timeout)?;
         }
 
         let mut seed_sets: Vec<&SeedSet> = phase.seed_sets.iter().collect();
@@ -83,9 +86,17 @@ impl<'a> SeedExecutor<'a> {
         Ok(())
     }
 
-    fn wait_for_object(&mut self, wf: &WaitForObject, phase_timeout: u64) -> Result<(), String> {
-        let timeout_secs = wf.timeout.unwrap_or(phase_timeout);
-        let deadline = Instant::now() + Duration::from_secs(timeout_secs);
+    fn wait_for_object(
+        &mut self,
+        wf: &WaitForObject,
+        phase_timeout: &Duration,
+    ) -> Result<(), String> {
+        let timeout_dur = match &wf.timeout {
+            Some(t) => parse_duration(t).map_err(|e| format!("invalid wait_for timeout: {}", e))?,
+            None => *phase_timeout,
+        };
+        let timeout_str = format_duration(timeout_dur);
+        let deadline = Instant::now() + timeout_dur;
         let poll_interval = Duration::from_millis(500);
 
         self.log.info(
@@ -93,7 +104,7 @@ impl<'a> SeedExecutor<'a> {
             &[
                 ("type", wf.obj_type.as_str()),
                 ("name", wf.name.as_str()),
-                ("timeout", &timeout_secs.to_string()),
+                ("timeout", &timeout_str),
             ],
         );
 
@@ -120,8 +131,8 @@ impl<'a> SeedExecutor<'a> {
 
             if Instant::now() >= deadline {
                 return Err(format!(
-                    "timeout after {}s waiting for {} '{}'",
-                    timeout_secs, wf.obj_type, wf.name
+                    "timeout after {} waiting for {} '{}'",
+                    timeout_str, wf.obj_type, wf.name
                 ));
             }
 
