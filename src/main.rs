@@ -18,7 +18,12 @@ use std::time::Duration;
     long_about = "Initium is a multi-tool CLI for Kubernetes initContainers.\nIt provides subcommands to wait for dependencies, run migrations,\nseed databases, render config templates, fetch secrets, and execute\narbitrary commands -- all with safe defaults, structured logging,\nand security guardrails."
 )]
 struct Cli {
-    #[arg(long, global = true, help = "Enable JSON log output")]
+    #[arg(
+        long,
+        global = true,
+        env = "INITIUM_JSON",
+        help = "Enable JSON log output"
+    )]
     json: bool,
 
     #[command(subcommand)]
@@ -32,32 +37,83 @@ enum Commands {
         #[arg(
             long,
             required = true,
+            env = "INITIUM_TARGET",
+            value_delimiter = ',',
             help = "Target endpoint (tcp://host:port or http(s)://...)"
         )]
         target: Vec<String>,
-        #[arg(long, default_value = "300", help = "Overall timeout in seconds")]
+        #[arg(
+            long,
+            default_value = "300",
+            env = "INITIUM_TIMEOUT",
+            help = "Overall timeout in seconds"
+        )]
         timeout: u64,
-        #[arg(long, default_value = "60", help = "Maximum retry attempts")]
+        #[arg(
+            long,
+            default_value = "60",
+            env = "INITIUM_MAX_ATTEMPTS",
+            help = "Maximum retry attempts"
+        )]
         max_attempts: u32,
-        #[arg(long, default_value = "1000", help = "Initial delay in milliseconds")]
+        #[arg(
+            long,
+            default_value = "1000",
+            env = "INITIUM_INITIAL_DELAY",
+            help = "Initial delay in milliseconds"
+        )]
         initial_delay: u64,
-        #[arg(long, default_value = "30000", help = "Maximum delay in milliseconds")]
+        #[arg(
+            long,
+            default_value = "30000",
+            env = "INITIUM_MAX_DELAY",
+            help = "Maximum delay in milliseconds"
+        )]
         max_delay: u64,
-        #[arg(long, default_value = "2.0", help = "Backoff multiplier")]
+        #[arg(
+            long,
+            default_value = "2.0",
+            env = "INITIUM_BACKOFF_FACTOR",
+            help = "Backoff multiplier"
+        )]
         backoff_factor: f64,
-        #[arg(long, default_value = "0.1", help = "Jitter fraction (0.0-1.0)")]
+        #[arg(
+            long,
+            default_value = "0.1",
+            env = "INITIUM_JITTER",
+            help = "Jitter fraction (0.0-1.0)"
+        )]
         jitter: f64,
-        #[arg(long, default_value = "200", help = "Expected HTTP status code")]
+        #[arg(
+            long,
+            default_value = "200",
+            env = "INITIUM_HTTP_STATUS",
+            help = "Expected HTTP status code"
+        )]
         http_status: u16,
-        #[arg(long, help = "Allow insecure TLS connections")]
+        #[arg(
+            long,
+            env = "INITIUM_INSECURE_TLS",
+            help = "Allow insecure TLS connections"
+        )]
         insecure_tls: bool,
     },
 
     /// Run a database migration command with structured logging
     Migrate {
-        #[arg(long, default_value = "/work", help = "Working directory")]
+        #[arg(
+            long,
+            default_value = "/work",
+            env = "INITIUM_WORKDIR",
+            help = "Working directory"
+        )]
         workdir: String,
-        #[arg(long, default_value = "", help = "Lock file for idempotency")]
+        #[arg(
+            long,
+            default_value = "",
+            env = "INITIUM_LOCK_FILE",
+            help = "Lock file for idempotency"
+        )]
         lock_file: String,
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
@@ -65,23 +121,48 @@ enum Commands {
 
     /// Apply structured database seeds from a YAML/JSON spec file
     Seed {
-        #[arg(long, help = "Path to seed spec file (YAML or JSON)")]
+        #[arg(
+            long,
+            required = true,
+            env = "INITIUM_SPEC",
+            help = "Path to seed spec file (YAML or JSON)"
+        )]
         spec: String,
-        #[arg(long, help = "Reset mode: delete existing data before re-seeding")]
+        #[arg(
+            long,
+            env = "INITIUM_RESET",
+            help = "Reset mode: delete existing data before re-seeding"
+        )]
         reset: bool,
     },
 
     /// Render templates into config files
     Render {
-        #[arg(long, help = "Path to template file")]
+        #[arg(
+            long,
+            required = true,
+            env = "INITIUM_TEMPLATE",
+            help = "Path to template file"
+        )]
         template: String,
-        #[arg(long, help = "Output file path relative to workdir")]
+        #[arg(
+            long,
+            required = true,
+            env = "INITIUM_OUTPUT",
+            help = "Output file path relative to workdir"
+        )]
         output: String,
-        #[arg(long, default_value = "/work", help = "Working directory")]
+        #[arg(
+            long,
+            default_value = "/work",
+            env = "INITIUM_WORKDIR",
+            help = "Working directory"
+        )]
         workdir: String,
         #[arg(
             long,
             default_value = "envsubst",
+            env = "INITIUM_MODE",
             help = "Template mode: envsubst or gotemplate"
         )]
         mode: String,
@@ -89,37 +170,91 @@ enum Commands {
 
     /// Fetch secrets or config from HTTP(S) endpoints
     Fetch {
-        #[arg(long, help = "URL to fetch")]
+        #[arg(long, required = true, env = "INITIUM_URL", help = "URL to fetch")]
         url: String,
-        #[arg(long, help = "Output file path relative to workdir")]
+        #[arg(
+            long,
+            required = true,
+            env = "INITIUM_OUTPUT",
+            help = "Output file path relative to workdir"
+        )]
         output: String,
-        #[arg(long, default_value = "/work", help = "Working directory")]
+        #[arg(
+            long,
+            default_value = "/work",
+            env = "INITIUM_WORKDIR",
+            help = "Working directory"
+        )]
         workdir: String,
-        #[arg(long, default_value = "", help = "Env var containing auth header")]
+        #[arg(
+            long,
+            default_value = "",
+            env = "INITIUM_AUTH_ENV",
+            help = "Env var containing auth header"
+        )]
         auth_env: String,
-        #[arg(long, help = "Skip TLS verification")]
+        #[arg(long, env = "INITIUM_INSECURE_TLS", help = "Skip TLS verification")]
         insecure_tls: bool,
-        #[arg(long, help = "Follow HTTP redirects")]
+        #[arg(long, env = "INITIUM_FOLLOW_REDIRECTS", help = "Follow HTTP redirects")]
         follow_redirects: bool,
-        #[arg(long, help = "Allow cross-site redirects")]
+        #[arg(
+            long,
+            env = "INITIUM_ALLOW_CROSS_SITE_REDIRECTS",
+            help = "Allow cross-site redirects"
+        )]
         allow_cross_site_redirects: bool,
-        #[arg(long, default_value = "300", help = "Timeout in seconds")]
+        #[arg(
+            long,
+            default_value = "300",
+            env = "INITIUM_TIMEOUT",
+            help = "Timeout in seconds"
+        )]
         timeout: u64,
-        #[arg(long, default_value = "3", help = "Max retry attempts")]
+        #[arg(
+            long,
+            default_value = "3",
+            env = "INITIUM_MAX_ATTEMPTS",
+            help = "Max retry attempts"
+        )]
         max_attempts: u32,
-        #[arg(long, default_value = "1000", help = "Initial delay in ms")]
+        #[arg(
+            long,
+            default_value = "1000",
+            env = "INITIUM_INITIAL_DELAY",
+            help = "Initial delay in ms"
+        )]
         initial_delay: u64,
-        #[arg(long, default_value = "30000", help = "Max delay in ms")]
+        #[arg(
+            long,
+            default_value = "30000",
+            env = "INITIUM_MAX_DELAY",
+            help = "Max delay in ms"
+        )]
         max_delay: u64,
-        #[arg(long, default_value = "2.0", help = "Backoff factor")]
+        #[arg(
+            long,
+            default_value = "2.0",
+            env = "INITIUM_BACKOFF_FACTOR",
+            help = "Backoff factor"
+        )]
         backoff_factor: f64,
-        #[arg(long, default_value = "0.1", help = "Jitter fraction")]
+        #[arg(
+            long,
+            default_value = "0.1",
+            env = "INITIUM_JITTER",
+            help = "Jitter fraction"
+        )]
         jitter: f64,
     },
 
     /// Run arbitrary commands with structured logging
     Exec {
-        #[arg(long, default_value = "", help = "Working directory")]
+        #[arg(
+            long,
+            default_value = "",
+            env = "INITIUM_WORKDIR",
+            help = "Working directory"
+        )]
         workdir: String,
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Environment variable support for all CLI flags via `INITIUM_*` prefix (e.g., `--json` → `INITIUM_JSON`, `--timeout` → `INITIUM_TIMEOUT`); flag values take precedence over env vars
+- Comma-separated `INITIUM_TARGET` env var for specifying multiple wait-for endpoints
+- Env var column added to all flag tables in `docs/usage.md`
+- Integration tests verifying env var fallback behavior and flag precedence over env vars
+
 ### Fixed
 - Added Cargo dependency caching (`Swatinem/rust-cache@v2`) to all CI and release workflow jobs for faster builds
 - Added Docker BuildKit layer caching (`type=gha`) to release workflow for both main and jyq image builds
