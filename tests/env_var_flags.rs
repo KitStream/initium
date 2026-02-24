@@ -1,14 +1,7 @@
 use std::process::Command;
 
 fn initium_bin() -> String {
-    let path = std::env::current_dir()
-        .unwrap()
-        .join("target/release/initium");
-    assert!(
-        path.exists(),
-        "release binary not found; run cargo build --release"
-    );
-    path.to_str().unwrap().to_string()
+    env!("CARGO_BIN_EXE_initium").to_string()
 }
 
 #[test]
