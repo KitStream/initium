@@ -76,11 +76,14 @@ impl<'a> SeedExecutor<'a> {
         }
 
         let mut seed_sets: Vec<&SeedSet> = phase.seed_sets.iter().collect();
+        seed_sets.sort_by_key(|s| s.order);
+
         if self.reset {
-            seed_sets.sort_by_key(|s| std::cmp::Reverse(s.order));
-        } else {
-            seed_sets.sort_by_key(|s| s.order);
+            for ss in seed_sets.iter().rev() {
+                self.reset_seed_set(ss)?;
+            }
         }
+
         for ss in &seed_sets {
             self.execute_seed_set(ss)?;
         }
@@ -144,24 +147,26 @@ impl<'a> SeedExecutor<'a> {
         }
     }
 
+    fn reset_seed_set(&mut self, ss: &SeedSet) -> Result<(), String> {
+        let name = &ss.name;
+        self.log
+            .info("reset mode: clearing seed set data", &[("seed_set", name)]);
+        let mut tables: Vec<&TableSeed> = ss.tables.iter().collect();
+        tables.sort_by_key(|t| std::cmp::Reverse(t.order));
+        for ts in &tables {
+            let count = self.db.delete_rows(&ts.table)?;
+            self.log.info(
+                "deleted rows",
+                &[("table", &ts.table), ("count", &count.to_string())],
+            );
+        }
+        self.db.remove_seed_mark(&self.tracking_table, name)?;
+        Ok(())
+    }
+
     fn execute_seed_set(&mut self, ss: &SeedSet) -> Result<(), String> {
         let name = &ss.name;
         self.log.info("processing seed set", &[("seed_set", name)]);
-
-        if self.reset {
-            self.log
-                .info("reset mode: clearing seed set data", &[("seed_set", name)]);
-            let mut tables: Vec<&TableSeed> = ss.tables.iter().collect();
-            tables.sort_by_key(|t| std::cmp::Reverse(t.order));
-            for ts in &tables {
-                let count = self.db.delete_rows(&ts.table)?;
-                self.log.info(
-                    "deleted rows",
-                    &[("table", &ts.table), ("count", &count.to_string())],
-                );
-            }
-            self.db.remove_seed_mark(&self.tracking_table, name)?;
-        }
 
         if self.db.is_seed_applied(&self.tracking_table, name)? {
             self.log
