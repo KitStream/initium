@@ -6,7 +6,10 @@ pub struct SeedPlan {
     pub version: String,
     #[serde(default)]
     pub database: DatabaseConfig,
+    #[serde(default)]
     pub seed_sets: Vec<SeedSet>,
+    #[serde(default)]
+    pub phases: Vec<SeedPhase>,
 }
 
 #[derive(Debug, Deserialize, Clone, Default)]
@@ -62,6 +65,38 @@ fn default_auto_id_type() -> String {
     "integer".into()
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct SeedPhase {
+    pub name: String,
+    #[serde(default)]
+    pub order: i32,
+    #[serde(default)]
+    pub database: String,
+    #[serde(default)]
+    pub schema: String,
+    #[serde(default)]
+    pub create_if_missing: bool,
+    #[serde(default)]
+    pub wait_for: Vec<WaitForObject>,
+    #[serde(default = "default_phase_timeout")]
+    pub timeout: u64,
+    #[serde(default)]
+    pub seed_sets: Vec<SeedSet>,
+}
+
+fn default_phase_timeout() -> u64 {
+    30
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct WaitForObject {
+    #[serde(rename = "type")]
+    pub obj_type: String,
+    pub name: String,
+    #[serde(default)]
+    pub timeout: Option<u64>,
+}
+
 impl SeedPlan {
     pub fn from_yaml(content: &str) -> Result<Self, String> {
         let plan: SeedPlan =
@@ -77,34 +112,84 @@ impl SeedPlan {
         Ok(plan)
     }
 
+    pub fn is_v2(&self) -> bool {
+        self.version == "2"
+    }
+
     pub fn validate(&self) -> Result<(), String> {
-        if self.version != "1" {
-            return Err(format!(
-                "unsupported seed schema version: {} (expected \"1\")",
+        match self.version.as_str() {
+            "1" => self.validate_v1(),
+            "2" => self.validate_v2(),
+            _ => Err(format!(
+                "unsupported seed schema version: {} (expected \"1\" or \"2\")",
                 self.version
-            ));
+            )),
         }
+    }
+
+    fn validate_v1(&self) -> Result<(), String> {
         if self.seed_sets.is_empty() {
             return Err("seed plan must contain at least one seed_set".into());
         }
         for ss in &self.seed_sets {
-            if ss.name.is_empty() {
-                return Err("seed_set name must not be empty".into());
+            Self::validate_seed_set(ss)?;
+        }
+        Ok(())
+    }
+
+    fn validate_v2(&self) -> Result<(), String> {
+        if self.phases.is_empty() {
+            return Err("v2 seed plan must contain at least one phase".into());
+        }
+        for phase in &self.phases {
+            if phase.name.is_empty() {
+                return Err("phase name must not be empty".into());
             }
-            if ss.tables.is_empty() {
+            for wf in &phase.wait_for {
+                Self::validate_wait_for(wf)?;
+            }
+            for ss in &phase.seed_sets {
+                Self::validate_seed_set(ss)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_seed_set(ss: &SeedSet) -> Result<(), String> {
+        if ss.name.is_empty() {
+            return Err("seed_set name must not be empty".into());
+        }
+        if ss.tables.is_empty() {
+            return Err(format!(
+                "seed_set '{}' must contain at least one table",
+                ss.name
+            ));
+        }
+        for ts in &ss.tables {
+            if ts.table.is_empty() {
                 return Err(format!(
-                    "seed_set '{}' must contain at least one table",
+                    "table name must not be empty in seed_set '{}'",
                     ss.name
                 ));
             }
-            for ts in &ss.tables {
-                if ts.table.is_empty() {
-                    return Err(format!(
-                        "table name must not be empty in seed_set '{}'",
-                        ss.name
-                    ));
-                }
-            }
+        }
+        Ok(())
+    }
+
+    fn validate_wait_for(wf: &WaitForObject) -> Result<(), String> {
+        let valid_types = ["table", "view", "schema", "database"];
+        if !valid_types.contains(&wf.obj_type.as_str()) {
+            return Err(format!(
+                "unsupported wait_for type '{}' (supported: {})",
+                wf.obj_type,
+                valid_types.join(", ")
+            ));
+        }
+        if wf.name.is_empty() {
+            return Err(format!(
+                "wait_for name must not be empty for type '{}'",
+                wf.obj_type
+            ));
         }
         Ok(())
     }
@@ -204,14 +289,15 @@ seed_sets:
     #[test]
     fn test_invalid_version() {
         let yaml = r#"
-version: "2"
+version: "3"
 seed_sets:
   - name: x
     tables:
       - table: t
         rows: []
 "#;
-        assert!(SeedPlan::from_yaml(yaml).is_err());
+        let err = SeedPlan::from_yaml(yaml).unwrap_err();
+        assert!(err.contains("unsupported seed schema version"));
     }
 
     #[test]
@@ -314,5 +400,199 @@ seed_sets:
         let emp_rows = &plan.seed_sets[0].tables[1].rows;
         let dept_id = emp_rows[0].get("department_id").unwrap();
         assert_eq!(dept_id.as_str().unwrap(), "@ref:dept_eng.id");
+    }
+
+    #[test]
+    fn test_parse_v2_phases() {
+        let yaml = r#"
+version: "2"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: setup
+    create_if_missing: true
+    wait_for:
+      - type: table
+        name: config
+    timeout: 10
+    seed_sets:
+      - name: initial
+        tables:
+          - table: config
+            rows:
+              - key: app_name
+                value: test
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        assert!(plan.is_v2());
+        assert_eq!(plan.phases.len(), 1);
+        assert_eq!(plan.phases[0].name, "setup");
+        assert!(plan.phases[0].create_if_missing);
+        assert_eq!(plan.phases[0].wait_for.len(), 1);
+        assert_eq!(plan.phases[0].wait_for[0].obj_type, "table");
+        assert_eq!(plan.phases[0].wait_for[0].name, "config");
+        assert_eq!(plan.phases[0].timeout, 10);
+        assert_eq!(plan.phases[0].seed_sets.len(), 1);
+    }
+
+    #[test]
+    fn test_v2_empty_phases() {
+        let yaml = r#"
+version: "2"
+phases: []
+"#;
+        let err = SeedPlan::from_yaml(yaml).unwrap_err();
+        assert!(err.contains("at least one phase"));
+    }
+
+    #[test]
+    fn test_v2_empty_phase_name() {
+        let yaml = r#"
+version: "2"
+phases:
+  - name: ""
+    seed_sets:
+      - name: x
+        tables:
+          - table: t
+            rows: []
+"#;
+        let err = SeedPlan::from_yaml(yaml).unwrap_err();
+        assert!(err.contains("phase name must not be empty"));
+    }
+
+    #[test]
+    fn test_v2_invalid_wait_for_type() {
+        let yaml = r#"
+version: "2"
+phases:
+  - name: setup
+    wait_for:
+      - type: index
+        name: my_index
+"#;
+        let err = SeedPlan::from_yaml(yaml).unwrap_err();
+        assert!(err.contains("unsupported wait_for type"));
+    }
+
+    #[test]
+    fn test_v2_empty_wait_for_name() {
+        let yaml = r#"
+version: "2"
+phases:
+  - name: setup
+    wait_for:
+      - type: table
+        name: ""
+"#;
+        let err = SeedPlan::from_yaml(yaml).unwrap_err();
+        assert!(err.contains("wait_for name must not be empty"));
+    }
+
+    #[test]
+    fn test_v2_multiple_phases() {
+        let yaml = r#"
+version: "2"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: phase1
+    order: 1
+    seed_sets:
+      - name: s1
+        tables:
+          - table: t1
+            rows:
+              - a: b
+  - name: phase2
+    order: 2
+    database: reporting
+    schema: analytics
+    create_if_missing: true
+    wait_for:
+      - type: schema
+        name: analytics
+    seed_sets:
+      - name: s2
+        tables:
+          - table: t2
+            rows:
+              - c: d
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        assert_eq!(plan.phases.len(), 2);
+        assert_eq!(plan.phases[0].name, "phase1");
+        assert_eq!(plan.phases[1].name, "phase2");
+        assert_eq!(plan.phases[1].database, "reporting");
+        assert_eq!(plan.phases[1].schema, "analytics");
+        assert!(plan.phases[1].create_if_missing);
+    }
+
+    #[test]
+    fn test_v2_default_timeout() {
+        let yaml = r#"
+version: "2"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: setup
+    seed_sets:
+      - name: s1
+        tables:
+          - table: t
+            rows:
+              - a: b
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        assert_eq!(plan.phases[0].timeout, 30);
+    }
+
+    #[test]
+    fn test_v2_wait_for_with_per_object_timeout() {
+        let yaml = r#"
+version: "2"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: setup
+    timeout: 60
+    wait_for:
+      - type: table
+        name: users
+        timeout: 120
+      - type: view
+        name: user_summary
+    seed_sets:
+      - name: s1
+        tables:
+          - table: t
+            rows:
+              - a: b
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        let wf = &plan.phases[0].wait_for;
+        assert_eq!(wf[0].timeout, Some(120));
+        assert_eq!(wf[1].timeout, None);
+    }
+
+    #[test]
+    fn test_v2_phase_without_seed_sets() {
+        let yaml = r#"
+version: "2"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: wait_only
+    wait_for:
+      - type: table
+        name: users
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        assert!(plan.phases[0].seed_sets.is_empty());
     }
 }

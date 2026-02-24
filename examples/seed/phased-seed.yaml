@@ -1,0 +1,73 @@
+# Example: Multi-phase PostgreSQL seeding with MiniJinja (v2)
+#
+# This seed spec demonstrates:
+# - MiniJinja templating with environment variables
+# - Phase-based execution with ordering
+# - Schema creation with create_if_missing
+# - Waiting for database objects before seeding
+# - Cross-table references across phases
+#
+# Usage:
+#   export DATABASE_URL=postgres://user:pass@localhost:5432/mydb
+#   export APP_SCHEMA=app_data
+#   initium seed --spec examples/seed/phased-seed.yaml
+
+version: "2"
+
+database:
+  driver: postgres
+  url_env: DATABASE_URL
+
+phases:
+  # Phase 1: Create the schema if it doesn't exist
+  - name: create_schema
+    order: 1
+    schema: {{ env.APP_SCHEMA | default("app_data") }}
+    create_if_missing: true
+
+  # Phase 2: Wait for tables to be created by migrations, then seed
+  - name: seed_departments
+    order: 2
+    timeout: 60
+    wait_for:
+      - type: table
+        name: departments
+      - type: table
+        name: employees
+    seed_sets:
+      - name: departments
+        tables:
+          - table: departments
+            order: 1
+            auto_id:
+              column: id
+            unique_key: [name]
+            rows:
+              - _ref: dept_eng
+                name: Engineering
+              - _ref: dept_sales
+                name: Sales
+              - _ref: dept_ops
+                name: Operations
+
+  # Phase 3: Seed employees referencing departments from phase 2
+  - name: seed_employees
+    order: 3
+    seed_sets:
+      - name: employees
+        tables:
+          - table: employees
+            unique_key: [email]
+            rows:
+              - name: Alice
+                email: alice@example.com
+                department_id: "@ref:dept_eng.id"
+              - name: Bob
+                email: bob@example.com
+                department_id: "@ref:dept_eng.id"
+              - name: Carol
+                email: carol@example.com
+                department_id: "@ref:dept_sales.id"
+              - name: Dave
+                email: dave@example.com
+                department_id: "@ref:dept_ops.id"

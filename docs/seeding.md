@@ -2,6 +2,8 @@
 
 Initium's `seed` subcommand applies structured, repeatable data provisioning to your database from YAML or JSON seed spec files. It replaces ad-hoc shell scripts with a declarative approach that supports idempotency, referential integrity, and a tracking table to prevent duplicate application.
 
+Seed spec files are MiniJinja templates: they are rendered with environment variables before parsing, enabling conditional phases, loops, and dynamic configuration.
+
 ## Supported Databases
 
 | Driver     | Connection URL format                          |
@@ -72,6 +74,77 @@ seed_sets:
 | `seed_sets[].tables[].auto_id.id_type` | string   | No       | ID type (default: `integer`)                              |
 | `seed_sets[].tables[].rows[]._ref`     | string   | No       | Internal reference name for cross-table references        |
 
+### Schema version 2 (phases + MiniJinja)
+
+Version 2 introduces **phases** — ordered stages that can create databases/schemas, wait for objects, and then seed data. The spec file is a MiniJinja template rendered before parsing.
+
+```yaml
+version: "2"
+
+database:
+  driver: postgres
+  url_env: DATABASE_URL
+  tracking_table: initium_seed
+
+phases:
+  - name: setup                    # Required. Phase name.
+    order: 1                       # Optional. Execution order (default: 0).
+    database: reporting            # Optional. Database to target/create.
+    schema: analytics              # Optional. Schema to target/create.
+    create_if_missing: true        # Optional. Create database/schema if missing.
+    timeout: 30                    # Optional. Default wait timeout in seconds (default: 30).
+    wait_for:                      # Optional. Objects to wait for before seeding.
+      - type: table                # One of: table, view, schema, database.
+        name: users
+        timeout: 60                # Optional. Per-object timeout override.
+    seed_sets:                     # Optional. Seed sets to apply in this phase.
+      - name: initial_data
+        tables:
+          - table: config
+            rows:
+              - key: app_name
+                value: "{{ env.APP_NAME }}"
+```
+
+### Version 2 field reference
+
+| Field                              | Type     | Required | Description                                                    |
+|------------------------------------|----------|----------|----------------------------------------------------------------|
+| `version`                          | string   | Yes      | Must be `"2"`                                                  |
+| `database.*`                       | object   | Yes      | Same as version 1 (driver, url, url_env, tracking_table)      |
+| `phases[].name`                    | string   | Yes      | Unique phase name                                              |
+| `phases[].order`                   | integer  | No       | Execution order (lower first, default: 0)                      |
+| `phases[].database`                | string   | No       | Target database name (for create/switch)                       |
+| `phases[].schema`                  | string   | No       | Target schema name (for create/switch)                         |
+| `phases[].create_if_missing`       | boolean  | No       | Create the database/schema if it does not exist (default: false) |
+| `phases[].timeout`                 | integer  | No       | Default timeout in seconds for wait_for objects (default: 30)  |
+| `phases[].wait_for[].type`         | string   | Yes      | Object type: `table`, `view`, `schema`, or `database`          |
+| `phases[].wait_for[].name`         | string   | Yes      | Object name to wait for                                        |
+| `phases[].wait_for[].timeout`      | integer  | No       | Per-object timeout override in seconds                         |
+| `phases[].seed_sets[]`             | object   | No       | Same structure as version 1 seed_sets                          |
+
+### Wait-for object support by driver
+
+| Object type | SQLite | PostgreSQL | MySQL |
+|-------------|--------|------------|-------|
+| `table`     | ✅     | ✅         | ✅    |
+| `view`      | ✅     | ✅         | ✅    |
+| `schema`    | ❌     | ✅         | ✅*   |
+| `database`  | ❌     | ✅         | ✅*   |
+
+\* In MySQL, `schema` and `database` are synonymous.
+
+### Create-if-missing support by driver
+
+| Operation         | SQLite | PostgreSQL | MySQL |
+|-------------------|--------|------------|-------|
+| `CREATE DATABASE` | ❌     | ✅         | ✅    |
+| `CREATE SCHEMA`   | ❌     | ✅         | ✅*   |
+
+\* In MySQL, `CREATE SCHEMA` maps to `CREATE DATABASE`.
+
+SQLite does not support separate databases or schemas — each file is a database.
+
 ### Database URL resolution
 
 The database URL is resolved in this order:
@@ -81,6 +154,35 @@ The database URL is resolved in this order:
 3. `DATABASE_URL` — fallback environment variable
 
 ## Features
+
+### MiniJinja Templating
+
+All seed spec files (both v1 and v2) are rendered as MiniJinja templates before parsing. Environment variables are available as `{{ env.VAR_NAME }}`. This enables:
+
+- **Dynamic values**: `{{ env.APP_VERSION }}`
+- **Conditional phases**: `{% if env.ENABLE_ANALYTICS %}...{% endif %}`
+- **Generated rows**: `{% for i in range(10) %}...{% endfor %}`
+- **Lenient mode**: missing env vars render as empty strings (no errors)
+
+```yaml
+version: "2"
+database:
+  driver: {{ env.DB_DRIVER }}
+  url_env: DATABASE_URL
+phases:
+  - name: config
+    seed_sets:
+      - name: app_config
+        tables:
+          - table: config
+            rows:
+{% for key in ["app_name", "version", "env"] %}
+              - key: {{ key }}
+                value: "{{ env['APP_' ~ key | upper] }}"
+{% endfor %}
+```
+
+Note: The `@ref:` syntax for cross-table references is processed at execution time (after template rendering), so it works seamlessly with MiniJinja templates.
 
 ### Idempotency via Tracking Table
 
@@ -215,22 +317,28 @@ spec:
 
 ## Failure Modes
 
-| Scenario                        | Behavior                                               |
-|---------------------------------|--------------------------------------------------------|
-| Invalid spec file               | Fails with parse error before connecting to database   |
-| Database unreachable            | Fails with connection error                            |
-| Unsupported driver              | Fails with descriptive error listing supported drivers |
-| Missing env var for URL         | Fails with error naming the missing variable           |
-| Missing env var in `$env:`      | Fails with error naming the missing variable           |
-| Unresolved `@ref:`              | Fails with error naming the missing reference          |
-| Row insertion failure           | Entire seed set rolled back via transaction            |
-| Duplicate row (with unique_key) | Row silently skipped                                   |
-| Already-applied seed set        | Seed set silently skipped                              |
+| Scenario                              | Behavior                                               |
+|---------------------------------------|--------------------------------------------------------|
+| Invalid spec file                     | Fails with parse error before connecting to database   |
+| Invalid MiniJinja template            | Fails with template syntax error before parsing YAML   |
+| Database unreachable                  | Fails with connection error                            |
+| Unsupported driver                    | Fails with descriptive error listing supported drivers |
+| Missing env var for URL               | Fails with error naming the missing variable           |
+| Missing env var in `$env:`            | Fails with error naming the missing variable           |
+| Unresolved `@ref:`                    | Fails with error naming the missing reference          |
+| Row insertion failure                 | Entire seed set rolled back via transaction            |
+| Duplicate row (with unique_key)       | Row silently skipped                                   |
+| Already-applied seed set              | Seed set silently skipped                              |
+| Wait-for object timeout (v2)         | Fails with structured timeout error naming the object  |
+| Unsupported object type for driver (v2) | Fails immediately with driver-specific error         |
+| CREATE DATABASE on SQLite (v2)       | Fails with "not supported" error                       |
+| CREATE SCHEMA on SQLite (v2)         | Fails with "not supported" error                       |
 
 ## Examples
 
 See the [`examples/seed/`](../examples/seed/) directory:
 
-- [`basic-seed.yaml`](../examples/seed/basic-seed.yaml) — PostgreSQL with departments and employees, cross-table references
-- [`sqlite-seed.yaml`](../examples/seed/sqlite-seed.yaml) — SQLite configuration table seeding
-- [`env-credentials-seed.yaml`](../examples/seed/env-credentials-seed.yaml) — MySQL with credentials from Kubernetes secrets
+- [`basic-seed.yaml`](../examples/seed/basic-seed.yaml) — PostgreSQL with departments and employees, cross-table references (v1)
+- [`sqlite-seed.yaml`](../examples/seed/sqlite-seed.yaml) — SQLite configuration table seeding (v1)
+- [`env-credentials-seed.yaml`](../examples/seed/env-credentials-seed.yaml) — MySQL with credentials from Kubernetes secrets (v1)
+- [`phased-seed.yaml`](../examples/seed/phased-seed.yaml) — Multi-phase PostgreSQL seeding with wait-for, create-if-missing, and MiniJinja templating (v2)

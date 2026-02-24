@@ -142,14 +142,17 @@ initium seed --spec /seeds/seed.yaml --json
 
 **Behavior:**
 
+- Seed spec files are MiniJinja templates rendered with env vars before parsing (`{{ env.VAR }}`)
 - Reads a YAML/JSON seed spec defining seed sets, tables, rows, and ordering
 - Creates a tracking table (default: `initium_seed`) to record applied seed sets
 - Skips already-applied seed sets unless `--reset` is used
 - Supports unique key detection to prevent duplicate row insertion
 - Supports auto-generated IDs and cross-table references via `_ref` / `@ref:`
-- Supports environment variable substitution via `$env:VAR_NAME`
+- Supports environment variable substitution via `$env:VAR_NAME` (v1) or MiniJinja `{{ env.VAR }}` (v2)
 - Each seed set is applied in a transaction; failures trigger rollback
 - In reset mode, tables are deleted in reverse order to respect foreign keys
+- **v2 phases**: ordered phases with `create_if_missing` (database/schema creation), `wait_for` (poll for objects with timeout), and seed data
+- **v2 wait-for**: supports `table`, `view`, `schema`, `database` object types (driver-dependent)
 
 **Exit codes:**
 

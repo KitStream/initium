@@ -54,7 +54,7 @@ kubectl apply -f https://raw.githubusercontent.com/kitstream/initium/main/exampl
 |---------|-------------|--------|
 | `wait-for` | Wait for TCP/HTTP/HTTPS endpoints | ✅ Available |
 | `migrate` | Run database migrations | ✅ Available |
-| `seed` | Structured database seeding from YAML/JSON | ✅ Available |
+| `seed` | Structured database seeding from YAML/JSON with MiniJinja templating | ✅ Available |
 | `render` | Render config templates | ✅ Available |
 | `fetch` | Fetch secrets/config from HTTP | ✅ Available |
 | `exec` | Run commands with structured logging | ✅ Available |

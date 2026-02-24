@@ -19,6 +19,10 @@ pub trait Database: Send {
     fn begin_transaction(&mut self) -> Result<(), String>;
     fn commit_transaction(&mut self) -> Result<(), String>;
     fn rollback_transaction(&mut self) -> Result<(), String>;
+    fn create_database(&mut self, name: &str) -> Result<(), String>;
+    fn create_schema(&mut self, name: &str) -> Result<(), String>;
+    fn object_exists(&mut self, obj_type: &str, name: &str) -> Result<bool, String>;
+    fn driver_name(&self) -> &str;
 }
 
 pub struct SqliteDb {
@@ -185,6 +189,48 @@ impl Database for SqliteDb {
         }
         Ok(())
     }
+
+    fn create_database(&mut self, _name: &str) -> Result<(), String> {
+        Err("sqlite does not support CREATE DATABASE (each file is a database)".into())
+    }
+
+    fn create_schema(&mut self, _name: &str) -> Result<(), String> {
+        Err("sqlite does not support schemas".into())
+    }
+
+    fn object_exists(&mut self, obj_type: &str, name: &str) -> Result<bool, String> {
+        match obj_type {
+            "table" => {
+                let count: i64 = self
+                    .conn
+                    .query_row(
+                        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?1",
+                        [name],
+                        |row| row.get(0),
+                    )
+                    .map_err(|e| format!("checking table existence: {}", e))?;
+                Ok(count > 0)
+            }
+            "view" => {
+                let count: i64 = self
+                    .conn
+                    .query_row(
+                        "SELECT COUNT(*) FROM sqlite_master WHERE type='view' AND name=?1",
+                        [name],
+                        |row| row.get(0),
+                    )
+                    .map_err(|e| format!("checking view existence: {}", e))?;
+                Ok(count > 0)
+            }
+            "schema" => Err("sqlite does not support schemas".into()),
+            "database" => Err("sqlite does not support checking database existence".into()),
+            _ => Err(format!("unsupported object type '{}' for sqlite", obj_type)),
+        }
+    }
+
+    fn driver_name(&self) -> &str {
+        "sqlite"
+    }
 }
 
 pub struct PostgresDb {
@@ -349,6 +395,66 @@ impl Database for PostgresDb {
             self.in_transaction = false;
         }
         Ok(())
+    }
+
+    fn create_database(&mut self, name: &str) -> Result<(), String> {
+        let safe = sanitize_identifier(name);
+        let row = self
+            .client
+            .query_one(
+                "SELECT COUNT(*) FROM pg_database WHERE datname = $1",
+                &[&safe],
+            )
+            .map_err(|e| format!("checking database existence: {}", e))?;
+        let count: i64 = row.get(0);
+        if count == 0 {
+            let sql = format!("CREATE DATABASE \"{}\"", safe);
+            self.client
+                .execute(&sql, &[])
+                .map_err(|e| format!("creating database '{}': {}", name, e))?;
+        }
+        Ok(())
+    }
+
+    fn create_schema(&mut self, name: &str) -> Result<(), String> {
+        let sql = format!(
+            "CREATE SCHEMA IF NOT EXISTS \"{}\"",
+            sanitize_identifier(name)
+        );
+        self.client
+            .execute(&sql, &[])
+            .map_err(|e| format!("creating schema '{}': {}", name, e))?;
+        Ok(())
+    }
+
+    fn object_exists(&mut self, obj_type: &str, name: &str) -> Result<bool, String> {
+        let sql = match obj_type {
+            "table" => {
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = $1".to_string()
+            }
+            "view" => {
+                "SELECT COUNT(*) FROM information_schema.views WHERE table_name = $1".to_string()
+            }
+            "schema" => "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name = $1"
+                .to_string(),
+            "database" => "SELECT COUNT(*) FROM pg_database WHERE datname = $1".to_string(),
+            _ => {
+                return Err(format!(
+                    "unsupported object type '{}' for postgres",
+                    obj_type
+                ))
+            }
+        };
+        let row = self
+            .client
+            .query_one(&sql, &[&name])
+            .map_err(|e| format!("checking {} existence: {}", obj_type, e))?;
+        let count: i64 = row.get(0);
+        Ok(count > 0)
+    }
+
+    fn driver_name(&self) -> &str {
+        "postgres"
     }
 }
 
@@ -528,6 +634,42 @@ impl Database for MysqlDb {
         }
         Ok(())
     }
+
+    fn create_database(&mut self, name: &str) -> Result<(), String> {
+        let sql = format!(
+            "CREATE DATABASE IF NOT EXISTS `{}`",
+            sanitize_identifier(name)
+        );
+        use mysql::prelude::Queryable;
+        self.conn
+            .query_drop(&sql)
+            .map_err(|e| format!("creating database '{}': {}", name, e))?;
+        Ok(())
+    }
+
+    fn create_schema(&mut self, name: &str) -> Result<(), String> {
+        // In MySQL, schema and database are synonymous
+        self.create_database(name)
+    }
+
+    fn object_exists(&mut self, obj_type: &str, name: &str) -> Result<bool, String> {
+        use mysql::prelude::Queryable;
+        let sql = match obj_type {
+            "table" => "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?",
+            "view" => "SELECT COUNT(*) FROM information_schema.views WHERE table_schema = DATABASE() AND table_name = ?",
+            "schema" | "database" => "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name = ?",
+            _ => return Err(format!("unsupported object type '{}' for mysql", obj_type)),
+        };
+        let count: Option<i64> = self
+            .conn
+            .exec_first(sql, (name,))
+            .map_err(|e| format!("checking {} existence: {}", obj_type, e))?;
+        Ok(count.unwrap_or(0) > 0)
+    }
+
+    fn driver_name(&self) -> &str {
+        "mysql"
+    }
 }
 
 pub fn connect(driver: &str, url: &str) -> Result<Box<dyn Database>, String> {
@@ -659,5 +801,73 @@ mod tests {
         db.mark_seed_applied("initium_seed", "set1").unwrap();
         db.mark_seed_applied("initium_seed", "set1").unwrap();
         assert!(db.is_seed_applied("initium_seed", "set1").unwrap());
+    }
+
+    #[test]
+    fn test_sqlite_object_exists_table() {
+        let mut db = SqliteDb::connect(":memory:").unwrap();
+        assert!(!db.object_exists("table", "users").unwrap());
+        db.conn
+            .execute("CREATE TABLE users (id INTEGER PRIMARY KEY)", [])
+            .unwrap();
+        assert!(db.object_exists("table", "users").unwrap());
+    }
+
+    #[test]
+    fn test_sqlite_object_exists_view() {
+        let mut db = SqliteDb::connect(":memory:").unwrap();
+        db.conn
+            .execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)", [])
+            .unwrap();
+        assert!(!db.object_exists("view", "items_view").unwrap());
+        db.conn
+            .execute("CREATE VIEW items_view AS SELECT * FROM items", [])
+            .unwrap();
+        assert!(db.object_exists("view", "items_view").unwrap());
+    }
+
+    #[test]
+    fn test_sqlite_object_exists_schema_unsupported() {
+        let mut db = SqliteDb::connect(":memory:").unwrap();
+        let result = db.object_exists("schema", "public");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("does not support schemas"));
+    }
+
+    #[test]
+    fn test_sqlite_object_exists_database_unsupported() {
+        let mut db = SqliteDb::connect(":memory:").unwrap();
+        let result = db.object_exists("database", "mydb");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_sqlite_create_database_unsupported() {
+        let mut db = SqliteDb::connect(":memory:").unwrap();
+        let result = db.create_database("mydb");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("does not support"));
+    }
+
+    #[test]
+    fn test_sqlite_create_schema_unsupported() {
+        let mut db = SqliteDb::connect(":memory:").unwrap();
+        let result = db.create_schema("myschema");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("does not support"));
+    }
+
+    #[test]
+    fn test_sqlite_driver_name() {
+        let db = SqliteDb::connect(":memory:").unwrap();
+        assert_eq!(db.driver_name(), "sqlite");
+    }
+
+    #[test]
+    fn test_sqlite_object_exists_unknown_type() {
+        let mut db = SqliteDb::connect(":memory:").unwrap();
+        let result = db.object_exists("index", "my_index");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("unsupported object type"));
     }
 }
