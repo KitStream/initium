@@ -8,6 +8,7 @@ pub trait Database: Send {
         table: &str,
         columns: &[String],
         values: &[String],
+        auto_id_column: Option<&str>,
     ) -> Result<Option<i64>, String>;
     fn row_exists(
         &mut self,
@@ -104,6 +105,7 @@ impl Database for SqliteDb {
         table: &str,
         columns: &[String],
         values: &[String],
+        _auto_id_column: Option<&str>,
     ) -> Result<Option<i64>, String> {
         let col_list: Vec<String> = columns
             .iter()
@@ -310,18 +312,20 @@ impl Database for PostgresDb {
         table: &str,
         columns: &[String],
         values: &[String],
+        auto_id_column: Option<&str>,
     ) -> Result<Option<i64>, String> {
         let col_list: Vec<String> = columns
             .iter()
             .map(|c| format!("\"{}\"", sanitize_identifier(c)))
             .collect();
         let placeholders: Vec<String> = (1..=values.len()).map(|i| format!("${}", i)).collect();
+        let returning_col = sanitize_identifier(auto_id_column.unwrap_or("id"));
         let sql = format!(
             "INSERT INTO \"{}\" ({}) VALUES ({}) RETURNING COALESCE(CAST(\"{}\" AS BIGINT), 0)",
             sanitize_identifier(table),
             col_list.join(", "),
             placeholders.join(", "),
-            sanitize_identifier(columns.first().map(|s| s.as_str()).unwrap_or("id"))
+            returning_col
         );
         let params: Vec<&(dyn postgres::types::ToSql + Sync)> = values
             .iter()
@@ -543,6 +547,7 @@ impl Database for MysqlDb {
         table: &str,
         columns: &[String],
         values: &[String],
+        _auto_id_column: Option<&str>,
     ) -> Result<Option<i64>, String> {
         let col_list: Vec<String> = columns
             .iter()
@@ -747,7 +752,7 @@ mod tests {
 
         let columns = vec!["name".into(), "email".into()];
         let values = vec!["Alice".into(), "alice@example.com".into()];
-        let id = db.insert_row("users", &columns, &values).unwrap();
+        let id = db.insert_row("users", &columns, &values, None).unwrap();
         assert!(id.is_some());
         assert_eq!(id.unwrap(), 1);
 
@@ -765,9 +770,9 @@ mod tests {
         db.conn
             .execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)", [])
             .unwrap();
-        db.insert_row("items", &["name".into()], &["item1".into()])
+        db.insert_row("items", &["name".into()], &["item1".into()], None)
             .unwrap();
-        db.insert_row("items", &["name".into()], &["item2".into()])
+        db.insert_row("items", &["name".into()], &["item2".into()], None)
             .unwrap();
         let count = db.delete_rows("items").unwrap();
         assert_eq!(count, 2);
@@ -780,7 +785,8 @@ mod tests {
             .execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)", [])
             .unwrap();
         db.begin_transaction().unwrap();
-        db.insert_row("t", &["v".into()], &["a".into()]).unwrap();
+        db.insert_row("t", &["v".into()], &["a".into()], None)
+            .unwrap();
         db.rollback_transaction().unwrap();
         let count: i64 = db
             .conn
@@ -789,7 +795,8 @@ mod tests {
         assert_eq!(count, 0);
 
         db.begin_transaction().unwrap();
-        db.insert_row("t", &["v".into()], &["b".into()]).unwrap();
+        db.insert_row("t", &["v".into()], &["b".into()], None)
+            .unwrap();
         db.commit_transaction().unwrap();
         let count: i64 = db
             .conn

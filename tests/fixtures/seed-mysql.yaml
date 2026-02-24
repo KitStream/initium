@@ -1,0 +1,37 @@
+database:
+  driver: mysql
+  url_env: MYSQL_URL
+  tracking_table: initium_seed
+
+phases:
+  - name: setup
+    order: 1
+    seed_sets:
+      - name: products
+        order: 1
+        tables:
+          - table: products
+            unique_key: [sku]
+            auto_id:
+              column: id
+            rows:
+              - _ref: prod_widget
+                sku: WIDGET-001
+                name: Widget
+                price: "9.99"
+              - _ref: prod_gadget
+                sku: GADGET-001
+                name: Gadget
+                price: "19.99"
+
+      - name: orders
+        order: 2
+        tables:
+          - table: orders
+            auto_id:
+              column: id
+            rows:
+              - product_id: "@ref:prod_widget.id"
+                quantity: "2"
+              - product_id: "@ref:prod_gadget.id"
+                quantity: "1"

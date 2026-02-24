@@ -1,0 +1,61 @@
+name: Integration Tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: initium
+          POSTGRES_PASSWORD: initium
+          POSTGRES_DB: initium_test
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd "pg_isready -U initium"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 10
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_USER: initium
+          MYSQL_PASSWORD: initium
+          MYSQL_DATABASE: initium_test
+        ports:
+          - 13306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -u root -prootpass"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+      http-server:
+        image: nginx:1-alpine
+        ports:
+          - 18080:80
+        options: >-
+          --health-cmd "wget --spider -q http://localhost:80/"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install psql and mysql clients
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client default-mysql-client
+      - name: Run integration tests
+        env:
+          INTEGRATION: "1"
+        run: cargo test --test integration_test -- --test-threads=1

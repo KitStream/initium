@@ -242,7 +242,8 @@ impl<'a> SeedExecutor<'a> {
                 continue;
             }
 
-            let generated_id = self.db.insert_row(table, &columns, &values)?;
+            let auto_id_col = ts.auto_id.as_ref().map(|a| a.column.as_str());
+            let generated_id = self.db.insert_row(table, &columns, &values, auto_id_col)?;
 
             if let Some(ref_key) = ref_name {
                 let mut ref_map = HashMap::new();

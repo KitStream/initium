@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: initium
+      POSTGRES_PASSWORD: initium
+      POSTGRES_DB: initium_test
+    ports:
+      - "15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U initium"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_USER: initium
+      MYSQL_PASSWORD: initium
+      MYSQL_DATABASE: initium_test
+    ports:
+      - "13306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpass"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  http-server:
+    image: nginx:1-alpine
+    ports:
+      - "18080:80"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
