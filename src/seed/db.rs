@@ -25,11 +25,13 @@ pub trait Database: Send {
     fn driver_name(&self) -> &str;
 }
 
+#[cfg(feature = "sqlite")]
 pub struct SqliteDb {
     pub(crate) conn: rusqlite::Connection,
     in_transaction: bool,
 }
 
+#[cfg(feature = "sqlite")]
 impl SqliteDb {
     pub fn connect(url: &str) -> Result<Self, String> {
         let conn = if url == ":memory:" {
@@ -47,6 +49,7 @@ impl SqliteDb {
     }
 }
 
+#[cfg(feature = "sqlite")]
 impl Database for SqliteDb {
     fn ensure_tracking_table(&mut self, table_name: &str) -> Result<(), String> {
         let sql = format!(
@@ -233,11 +236,13 @@ impl Database for SqliteDb {
     }
 }
 
+#[cfg(feature = "postgres")]
 pub struct PostgresDb {
     client: postgres::Client,
     in_transaction: bool,
 }
 
+#[cfg(feature = "postgres")]
 impl PostgresDb {
     pub fn connect(url: &str) -> Result<Self, String> {
         let client = postgres::Client::connect(url, postgres::NoTls)
@@ -249,6 +254,7 @@ impl PostgresDb {
     }
 }
 
+#[cfg(feature = "postgres")]
 impl Database for PostgresDb {
     fn ensure_tracking_table(&mut self, table_name: &str) -> Result<(), String> {
         let sql = format!(
@@ -458,11 +464,13 @@ impl Database for PostgresDb {
     }
 }
 
+#[cfg(feature = "mysql")]
 pub struct MysqlDb {
     conn: mysql::PooledConn,
     in_transaction: bool,
 }
 
+#[cfg(feature = "mysql")]
 impl MysqlDb {
     pub fn connect(url: &str) -> Result<Self, String> {
         let pool = mysql::Pool::new(url).map_err(|e| format!("connecting to mysql: {}", e))?;
@@ -476,6 +484,7 @@ impl MysqlDb {
     }
 }
 
+#[cfg(feature = "mysql")]
 impl Database for MysqlDb {
     fn ensure_tracking_table(&mut self, table_name: &str) -> Result<(), String> {
         let sql = format!(
@@ -674,13 +683,26 @@ impl Database for MysqlDb {
 
 pub fn connect(driver: &str, url: &str) -> Result<Box<dyn Database>, String> {
     match driver {
+        #[cfg(feature = "sqlite")]
         "sqlite" => Ok(Box::new(SqliteDb::connect(url)?)),
+        #[cfg(feature = "postgres")]
         "postgres" | "postgresql" => Ok(Box::new(PostgresDb::connect(url)?)),
+        #[cfg(feature = "mysql")]
         "mysql" => Ok(Box::new(MysqlDb::connect(url)?)),
-        _ => Err(format!(
-            "unsupported database driver: '{}' (supported: sqlite, postgres, mysql)",
-            driver
-        )),
+        _ => {
+            let mut supported = Vec::new();
+            #[cfg(feature = "sqlite")]
+            supported.push("sqlite");
+            #[cfg(feature = "postgres")]
+            supported.push("postgres");
+            #[cfg(feature = "mysql")]
+            supported.push("mysql");
+            Err(format!(
+                "unsupported database driver: '{}' (supported: {})",
+                driver,
+                supported.join(", ")
+            ))
+        }
     }
 }
 

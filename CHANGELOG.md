@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Added Cargo dependency caching (`Swatinem/rust-cache@v2`) to all CI and release workflow jobs for faster builds
+- Added Docker BuildKit layer caching (`type=gha`) to release workflow for both main and jyq image builds
+- Replaced Dockerfile stub-build caching layer with BuildKit `--mount=type=cache` for cargo registry and target directory, enabling cross-build cache reuse
+
+### Changed
+- Replaced `regex` crate with manual envsubst parser in render module for smaller binary
+- Replaced `chrono` crate with `std::time::SystemTime` and Hinnant's civil calendar algorithm in logging module
+- Switched rustls from default crypto backends (aws-lc-rs + ring) to ring-only
+- Disabled ureq default features (gzip/brotli) to reduce dependency tree
+- Database drivers (sqlite, postgres, mysql) are now optional Cargo features (all enabled by default); build with `--no-default-features --features sqlite` for minimal binary
+
 ### Removed
 - Seed schema version 1 (flat `seed_sets` without phases): all seed specs now use phase-based structure
 - `version` field from seed spec schema: no longer required or accepted

@@ -13,6 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - run: cargo test --all
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -34,6 +35,8 @@ jobs:
           tags: |
             ghcr.io/kitstream/initium:${{ steps.version.outputs.VERSION }}
             ghcr.io/kitstream/initium:latest
+          cache-from: type=gha,scope=docker-main
+          cache-to: type=gha,mode=max,scope=docker-main
           sbom: true
           provenance: true
       - uses: docker/build-push-action@v6
@@ -47,5 +50,7 @@ jobs:
           tags: |
             ghcr.io/kitstream/initium-jyq:${{ steps.version.outputs.VERSION }}
             ghcr.io/kitstream/initium-jyq:latest
+          cache-from: type=gha,scope=docker-jyq
+          cache-to: type=gha,mode=max,scope=docker-jyq
           sbom: true
           provenance: true

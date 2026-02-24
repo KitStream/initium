@@ -1,15 +1,63 @@
-use regex::Regex;
 use std::env;
 pub fn envsubst(input: &str) -> String {
-    let re = Regex::new(r"\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}|\$([a-zA-Z_][a-zA-Z0-9_]*)").unwrap();
-    re.replace_all(input, |caps: &regex::Captures| {
-        let name = caps.get(1).or_else(|| caps.get(2)).unwrap().as_str();
-        match env::var(name) {
-            Ok(val) => val,
-            Err(_) => caps[0].to_string(),
+    let mut result = String::with_capacity(input.len());
+    let bytes = input.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+    while i < len {
+        if bytes[i] == b'$' && i + 1 < len {
+            if bytes[i + 1] == b'{' {
+                if let Some((name, end)) = parse_braced_var(input, i + 2) {
+                    match env::var(name) {
+                        Ok(val) => result.push_str(&val),
+                        Err(_) => result.push_str(&input[i..end]),
+                    }
+                    i = end;
+                    continue;
+                }
+            } else if is_var_start(bytes[i + 1]) {
+                let start = i + 1;
+                let mut end = start + 1;
+                while end < len && is_var_char(bytes[end]) {
+                    end += 1;
+                }
+                let name = &input[start..end];
+                match env::var(name) {
+                    Ok(val) => result.push_str(&val),
+                    Err(_) => result.push_str(&input[i..end]),
+                }
+                i = end;
+                continue;
+            }
         }
-    })
-    .into_owned()
+        result.push(bytes[i] as char);
+        i += 1;
+    }
+    result
+}
+
+fn is_var_start(b: u8) -> bool {
+    b.is_ascii_alphabetic() || b == b'_'
+}
+
+fn is_var_char(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}
+
+fn parse_braced_var(input: &str, start: usize) -> Option<(&str, usize)> {
+    let bytes = input.as_bytes();
+    if start >= bytes.len() || !is_var_start(bytes[start]) {
+        return None;
+    }
+    let mut end = start + 1;
+    while end < bytes.len() && is_var_char(bytes[end]) {
+        end += 1;
+    }
+    if end < bytes.len() && bytes[end] == b'}' {
+        Some((&input[start..end], end + 1))
+    } else {
+        None
+    }
 }
 pub fn template_render(input: &str) -> Result<String, String> {
     let env_map: std::collections::HashMap<String, String> = env::vars().collect();

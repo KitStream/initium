@@ -3,9 +3,9 @@ ARG VERSION=dev
 RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static perl
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && echo 'fn main() {}' > src/main.rs && cargo build --release && rm -rf src
 COPY . .
-RUN touch src/main.rs && \
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/src/target \
     cargo build --release && \
     cp target/release/initium /initium
 FROM alpine:3.21

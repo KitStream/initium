@@ -44,7 +44,7 @@ kubectl apply -f https://raw.githubusercontent.com/kitstream/initium/main/exampl
 | **Structured logging**    | `echo` statements                | JSON or text with timestamps       |
 | **Security**              | Runs as root, full shell         | Non-root, no shell, read-only FS   |
 | **Secret handling**       | Easily leaked in logs            | Automatic redaction                |
-| **Multiple tools**        | Install curl, netcat, psql…      | Single 2MB image                   |
+| **Multiple tools**        | Install curl, netcat, psql…      | Single small image                 |
 | **Reproducibility**       | Shell differences across distros | Single Rust binary, `FROM scratch` |
 | **Vulnerability surface** | Full OS + shell utils            | Zero OS packages                   |
 
@@ -77,6 +77,27 @@ initium wait-for \
 # HTTPS with self-signed certificates
 initium wait-for --target https://vault:8200/v1/sys/health --insecure-tls
 ```
+
+## Cargo Features
+
+Database drivers are optional Cargo features, all enabled by default. Disable unused drivers for a smaller binary:
+
+```bash
+# All drivers (default)
+cargo build --release
+
+# PostgreSQL + SQLite only (no MySQL)
+cargo build --release --no-default-features --features postgres,sqlite
+
+# SQLite only (smallest binary)
+cargo build --release --no-default-features --features sqlite
+```
+
+| Feature    | Default | Description        |
+| ---------- | ------- | ------------------ |
+| `sqlite`   | ✅       | SQLite driver      |
+| `postgres` | ✅       | PostgreSQL driver  |
+| `mysql`    | ✅       | MySQL/MariaDB driver |
 
 ## Helm Chart
 
