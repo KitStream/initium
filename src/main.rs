@@ -123,6 +123,7 @@ enum Commands {
     Seed {
         #[arg(
             long,
+            required = true,
             env = "INITIUM_SPEC",
             help = "Path to seed spec file (YAML or JSON)"
         )]
@@ -137,10 +138,16 @@ enum Commands {
 
     /// Render templates into config files
     Render {
-        #[arg(long, env = "INITIUM_TEMPLATE", help = "Path to template file")]
+        #[arg(
+            long,
+            required = true,
+            env = "INITIUM_TEMPLATE",
+            help = "Path to template file"
+        )]
         template: String,
         #[arg(
             long,
+            required = true,
             env = "INITIUM_OUTPUT",
             help = "Output file path relative to workdir"
         )]
@@ -163,10 +170,11 @@ enum Commands {
 
     /// Fetch secrets or config from HTTP(S) endpoints
     Fetch {
-        #[arg(long, env = "INITIUM_URL", help = "URL to fetch")]
+        #[arg(long, required = true, env = "INITIUM_URL", help = "URL to fetch")]
         url: String,
         #[arg(
             long,
+            required = true,
             env = "INITIUM_OUTPUT",
             help = "Output file path relative to workdir"
         )]
