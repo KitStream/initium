@@ -1,4 +1,4 @@
-use crate::duration::parse_duration;
+use crate::duration::{format_duration, parse_duration};
 use crate::logging::Logger;
 use crate::seed::db::Database;
 use crate::seed::schema::{SeedPhase, SeedPlan, SeedSet, TableSeed, WaitForObject};
@@ -95,7 +95,7 @@ impl<'a> SeedExecutor<'a> {
             Some(t) => parse_duration(t).map_err(|e| format!("invalid wait_for timeout: {}", e))?,
             None => *phase_timeout,
         };
-        let timeout_secs = timeout_dur.as_secs();
+        let timeout_str = format_duration(timeout_dur);
         let deadline = Instant::now() + timeout_dur;
         let poll_interval = Duration::from_millis(500);
 
@@ -104,7 +104,7 @@ impl<'a> SeedExecutor<'a> {
             &[
                 ("type", wf.obj_type.as_str()),
                 ("name", wf.name.as_str()),
-                ("timeout", &format!("{}s", timeout_secs)),
+                ("timeout", &timeout_str),
             ],
         );
 
@@ -131,8 +131,8 @@ impl<'a> SeedExecutor<'a> {
 
             if Instant::now() >= deadline {
                 return Err(format!(
-                    "timeout after {}s waiting for {} '{}'",
-                    timeout_secs, wf.obj_type, wf.name
+                    "timeout after {} waiting for {} '{}'",
+                    timeout_str, wf.obj_type, wf.name
                 ));
             }
 

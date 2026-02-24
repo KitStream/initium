@@ -168,6 +168,54 @@ fn test_env_var_fallback_for_workdir() {
 }
 
 #[test]
+fn test_bare_number_timeout_accepted() {
+    // Bare number without unit should be treated as seconds (documented behavior)
+    let output = Command::new(initium_bin())
+        .args([
+            "wait-for",
+            "--target",
+            "tcp://localhost:1",
+            "--timeout",
+            "1",
+            "--max-attempts",
+            "1",
+        ])
+        .output()
+        .unwrap();
+    // Should exit non-zero (connection failure), not complain about invalid duration
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("invalid"),
+        "bare number timeout should be accepted: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_bare_number_timeout_via_env_var() {
+    // INITIUM_TIMEOUT=1 (bare number) should be accepted as 1 second
+    let output = Command::new(initium_bin())
+        .args([
+            "wait-for",
+            "--target",
+            "tcp://localhost:1",
+            "--max-attempts",
+            "1",
+        ])
+        .env("INITIUM_TIMEOUT", "1")
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("invalid"),
+        "bare number env var timeout should be accepted: {}",
+        stderr
+    );
+}
+
+#[test]
 fn test_env_var_false_boolean_not_set() {
     // INITIUM_JSON=false should keep text output
     let output = Command::new(initium_bin())

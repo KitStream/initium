@@ -90,7 +90,6 @@ pub fn parse_duration(input: &str) -> Result<Duration, String> {
 
 /// Format a Duration into a human-friendly combined string.
 /// Uses the largest applicable units and combines them (e.g. `1m30s`, `2h15m`).
-#[allow(dead_code)]
 pub fn format_duration(d: Duration) -> String {
     let total_ms = d.as_millis();
     if total_ms == 0 {
