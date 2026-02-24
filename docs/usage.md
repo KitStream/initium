@@ -46,7 +46,7 @@ initium wait-for --target https://vault:8200/v1/sys/health --insecure-tls
 
 | Flag               | Default      | Env Var                  | Description                                  |
 | ------------------ | ------------ | ------------------------ | -------------------------------------------- |
-| `--target`         | _(required)_ |                          | Target URL (`tcp://`, `http://`, `https://`) |
+| `--target`         | _(required)_ | `INITIUM_TARGET`         | Target URL (`tcp://`, `http://`, `https://`) |
 | `--timeout`        | `5m`         | `INITIUM_TIMEOUT`        | Overall timeout                              |
 | `--max-attempts`   | `60`         | `INITIUM_MAX_ATTEMPTS`   | Max retry attempts                           |
 | `--initial-delay`  | `1s`         | `INITIUM_INITIAL_DELAY`  | Initial retry delay                          |
@@ -88,11 +88,11 @@ initium migrate --lock-file .migrated --workdir /work -- /app/migrate up
 
 **Flags:**
 
-| Flag          | Default   | Description                                                 |
-| ------------- | --------- | ----------------------------------------------------------- |
-| `--workdir`   | `/work`   | Working directory for file operations                       |
-| `--lock-file` | _(none)_  | Skip migration if this file exists in workdir (idempotency) |
-| `--json`      | `false`   | Enable JSON log output                                      |
+| Flag          | Default   | Env Var              | Description                                                 |
+| ------------- | --------- | -------------------- | ----------------------------------------------------------- |
+| `--workdir`   | `/work`   | `INITIUM_WORKDIR`    | Working directory for file operations                       |
+| `--lock-file` | _(none)_  | `INITIUM_LOCK_FILE`  | Skip migration if this file exists in workdir (idempotency) |
+| `--json`      | `false`   | `INITIUM_JSON`       | Enable JSON log output                                      |
 
 **Behavior:**
 
@@ -134,11 +134,11 @@ initium seed --spec /seeds/seed.yaml --json
 
 **Flags:**
 
-| Flag      | Default      | Description                             |
-| --------- | ------------ | --------------------------------------- |
-| `--spec`  | _(required)_ | Path to seed spec file (YAML or JSON)   |
-| `--reset` | `false`      | Delete existing data and re-apply seeds |
-| `--json`  | `false`      | Enable JSON log output                  |
+| Flag      | Default      | Env Var            | Description                             |
+| --------- | ------------ | ------------------ | --------------------------------------- |
+| `--spec`  | _(required)_ | `INITIUM_SPEC`     | Path to seed spec file (YAML or JSON)   |
+| `--reset` | `false`      | `INITIUM_RESET`    | Delete existing data and re-apply seeds |
+| `--json`  | `false`      | `INITIUM_JSON`     | Enable JSON log output                  |
 
 **Behavior:**
 
@@ -190,13 +190,13 @@ initium render --template /tpl/db.conf.tmpl --output config/db.conf --workdir /w
 
 **Flags:**
 
-| Flag         | Default      | Description                               |
-| ------------ | ------------ | ----------------------------------------- |
-| `--template` | _(required)_ | Path to template file                     |
-| `--output`   | _(required)_ | Output file path relative to workdir      |
-| `--workdir`  | `/work`      | Working directory for output files        |
-| `--mode`     | `envsubst`   | Template mode: `envsubst` or `gotemplate` |
-| `--json`     | `false`      | Enable JSON log output                    |
+| Flag         | Default      | Env Var             | Description                               |
+| ------------ | ------------ | ------------------- | ----------------------------------------- |
+| `--template` | _(required)_ | `INITIUM_TEMPLATE`  | Path to template file                     |
+| `--output`   | _(required)_ | `INITIUM_OUTPUT`    | Output file path relative to workdir      |
+| `--workdir`  | `/work`      | `INITIUM_WORKDIR`   | Working directory for output files        |
+| `--mode`     | `envsubst`   | `INITIUM_MODE`      | Template mode: `envsubst` or `gotemplate` |
+| `--json`     | `false`      | `INITIUM_JSON`      | Enable JSON log output                    |
 
 **Exit codes:**
 
@@ -235,22 +235,22 @@ initium fetch --url http://cdn/config --output config.json \
 
 **Flags:**
 
-| Flag                           | Default      | Description                                                |
-| ------------------------------ | ------------ | ---------------------------------------------------------- |
-| `--url`                        | _(required)_ | Target URL to fetch                                        |
-| `--output`                     | _(required)_ | Output file path relative to workdir                       |
-| `--workdir`                    | `/work`      | Working directory for output files                         |
-| `--auth-env`                   | _(none)_     | Name of env var containing the Authorization header value  |
-| `--insecure-tls`               | `false`      | Skip TLS certificate verification                          |
-| `--follow-redirects`           | `false`      | Follow HTTP redirects                                      |
-| `--allow-cross-site-redirects` | `false`      | Allow cross-site redirects (requires `--follow-redirects`) |
-| `--timeout`                    | `5m`         | Overall timeout                                            |
-| `--max-attempts`               | `3`          | Maximum retry attempts                                     |
-| `--initial-delay`              | `1s`         | Initial delay between retries                              |
-| `--max-delay`                  | `30s`        | Maximum delay between retries                              |
-| `--backoff-factor`             | `2.0`        | Backoff multiplier                                         |
-| `--jitter`                     | `0.1`        | Jitter fraction (0.0–1.0)                                  |
-| `--json`                       | `false`      | Enable JSON log output                                     |
+| Flag                           | Default      | Env Var                              | Description                                                |
+| ------------------------------ | ------------ | ------------------------------------ | ---------------------------------------------------------- |
+| `--url`                        | _(required)_ | `INITIUM_URL`                        | Target URL to fetch                                        |
+| `--output`                     | _(required)_ | `INITIUM_OUTPUT`                     | Output file path relative to workdir                       |
+| `--workdir`                    | `/work`      | `INITIUM_WORKDIR`                    | Working directory for output files                         |
+| `--auth-env`                   | _(none)_     | `INITIUM_AUTH_ENV`                   | Name of env var containing the Authorization header value  |
+| `--insecure-tls`               | `false`      | `INITIUM_INSECURE_TLS`               | Skip TLS certificate verification                          |
+| `--follow-redirects`           | `false`      | `INITIUM_FOLLOW_REDIRECTS`           | Follow HTTP redirects                                      |
+| `--allow-cross-site-redirects` | `false`      | `INITIUM_ALLOW_CROSS_SITE_REDIRECTS` | Allow cross-site redirects (requires `--follow-redirects`) |
+| `--timeout`                    | `5m`         | `INITIUM_TIMEOUT`                    | Overall timeout                                            |
+| `--max-attempts`               | `3`          | `INITIUM_MAX_ATTEMPTS`               | Maximum retry attempts                                     |
+| `--initial-delay`              | `1s`         | `INITIUM_INITIAL_DELAY`              | Initial delay between retries                              |
+| `--max-delay`                  | `30s`        | `INITIUM_MAX_DELAY`                  | Maximum delay between retries                              |
+| `--backoff-factor`             | `2.0`        | `INITIUM_BACKOFF_FACTOR`             | Backoff multiplier                                         |
+| `--jitter`                     | `0.1`        | `INITIUM_JITTER`                     | Jitter fraction (0.0–1.0)                                  |
+| `--json`                       | `false`      | `INITIUM_JSON`                       | Enable JSON log output                                     |
 
 **Security notes:**
 
@@ -292,10 +292,10 @@ initium exec --workdir /certs -- openssl genrsa -out key.pem 4096
 
 **Flags:**
 
-| Flag        | Default     | Description                             |
-| ----------- | ----------- | --------------------------------------- |
-| `--workdir` | _(inherit)_ | Working directory for the child process |
-| `--json`    | `false`     | Enable JSON log output                  |
+| Flag        | Default     | Env Var           | Description                             |
+| ----------- | ----------- | ----------------- | --------------------------------------- |
+| `--workdir` | _(inherit)_ | `INITIUM_WORKDIR` | Working directory for the child process |
+| `--json`    | `false`     | `INITIUM_JSON`    | Enable JSON log output                  |
 
 **Behavior:**
 
@@ -364,9 +364,11 @@ initContainers:
 
 ## Global Flags
 
-| Flag     | Default   | Description                      |
-| -------- | --------- | -------------------------------- |
-| `--json` | `false`   | Enable JSON-formatted log output |
+| Flag     | Default | Env Var        | Description                      |
+| -------- | ------- | -------------- | -------------------------------- |
+| `--json` | `false` | `INITIUM_JSON` | Enable JSON-formatted log output |
+
+All flags can be set via environment variables. Flag values take precedence over environment variables. Boolean env vars accept `true`/`false`, `1`/`0`, `yes`/`no`. The `INITIUM_TARGET` env var accepts comma-separated values for multiple targets.
 
 ## Exit Codes
 
