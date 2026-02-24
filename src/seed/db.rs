@@ -318,13 +318,13 @@ impl Database for PostgresDb {
             .iter()
             .map(|c| format!("\"{}\"", sanitize_identifier(c)))
             .collect();
-        let placeholders: Vec<String> = (1..=values.len()).map(|i| format!("${}", i)).collect();
+        let value_list: Vec<String> = values.iter().map(|v| escape_sql_value(v)).collect();
         let returning_col = sanitize_identifier(auto_id_column.unwrap_or("id"));
         let sql = format!(
             "INSERT INTO \"{}\" ({}) VALUES ({}) RETURNING COALESCE(CAST(\"{}\" AS BIGINT), 0)",
             sanitize_identifier(table),
             col_list.join(", "),
-            placeholders.join(", "),
+            value_list.join(", "),
             returning_col
         );
         let row = self
