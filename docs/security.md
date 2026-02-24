@@ -15,16 +15,16 @@ Initium runs as an initContainer in Kubernetes pods. Its threat model considers:
 
 ### Attack Vectors Addressed
 
-| Vector | Mitigation |
-|--------|-----------|
-| **Path traversal** | All file writes constrained to `--workdir`; absolute paths rejected; `..` sequences resolved and validated |
-| **Secret leakage via logs** | Automatic redaction of keys matching `token`, `password`, `secret`, `auth`, `api_key`, `authorization` |
-| **Privilege escalation** | Container runs as UID 65534 (nobody); `allowPrivilegeEscalation: false`; all capabilities dropped |
-| **Filesystem tampering** | `readOnlyRootFilesystem: true`; writes only to mounted emptyDir volumes |
-| **Unintended network access** | All target URLs must be explicitly provided via flags; no default outbound connections |
-| **TLS downgrade** | TLS verification enabled by default; `--insecure-tls` requires explicit opt-in |
-| **Shell injection** | Commands executed via `execve` (no shell); `--` separator for command arguments |
-| **Supply chain** | Minimal `scratch` base image; SBOM and provenance attestation in CI; pinned dependencies |
+| Vector                        | Mitigation                                                                                                 |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Path traversal**            | All file writes constrained to `--workdir`; absolute paths rejected; `..` sequences resolved and validated |
+| **Secret leakage via logs**   | Automatic redaction of keys matching `token`, `password`, `secret`, `auth`, `api_key`, `authorization`     |
+| **Privilege escalation**      | Container runs as UID 65534 (nobody); `allowPrivilegeEscalation: false`; all capabilities dropped          |
+| **Filesystem tampering**      | `readOnlyRootFilesystem: true`; writes only to mounted emptyDir volumes                                    |
+| **Unintended network access** | All target URLs must be explicitly provided via flags; no default outbound connections                     |
+| **TLS downgrade**             | TLS verification enabled by default; `--insecure-tls` requires explicit opt-in                             |
+| **Shell injection**           | Commands executed via `execve` (no shell); `--` separator for command arguments                            |
+| **Supply chain**              | Minimal `scratch` base image; SBOM and provenance attestation in CI; pinned dependencies                   |
 
 ## Safe Defaults
 

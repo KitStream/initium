@@ -1,7 +1,8 @@
 use crate::logging::Logger;
 use crate::seed::db::Database;
-use crate::seed::schema::{SeedPlan, SeedSet, TableSeed};
+use crate::seed::schema::{SeedPhase, SeedPlan, SeedSet, TableSeed, WaitForObject};
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 pub struct SeedExecutor<'a> {
     log: &'a Logger,
@@ -29,18 +30,103 @@ impl<'a> SeedExecutor<'a> {
 
     pub fn execute(&mut self, plan: &SeedPlan) -> Result<(), String> {
         self.log.info("starting seed execution", &[]);
-
         self.db.ensure_tracking_table(&self.tracking_table)?;
 
-        let mut seed_sets: Vec<&SeedSet> = plan.seed_sets.iter().collect();
-        seed_sets.sort_by_key(|s| s.order);
+        self.execute_phases(plan)?;
 
+        self.log.info("seed execution completed", &[]);
+        Ok(())
+    }
+
+    fn execute_phases(&mut self, plan: &SeedPlan) -> Result<(), String> {
+        let mut phases: Vec<&SeedPhase> = plan.phases.iter().collect();
+        phases.sort_by_key(|p| p.order);
+        for phase in &phases {
+            self.execute_phase(phase)?;
+        }
+        Ok(())
+    }
+
+    fn execute_phase(&mut self, phase: &SeedPhase) -> Result<(), String> {
+        self.log
+            .info("executing phase", &[("phase", phase.name.as_str())]);
+
+        if phase.create_if_missing {
+            if !phase.database.is_empty() {
+                self.log.info(
+                    "creating database if missing",
+                    &[("database", phase.database.as_str())],
+                );
+                self.db.create_database(&phase.database)?;
+            }
+            if !phase.schema.is_empty() {
+                self.log.info(
+                    "creating schema if missing",
+                    &[("schema", phase.schema.as_str())],
+                );
+                self.db.create_schema(&phase.schema)?;
+            }
+        }
+
+        for wf in &phase.wait_for {
+            self.wait_for_object(wf, phase.timeout)?;
+        }
+
+        let mut seed_sets: Vec<&SeedSet> = phase.seed_sets.iter().collect();
+        seed_sets.sort_by_key(|s| s.order);
         for ss in &seed_sets {
             self.execute_seed_set(ss)?;
         }
 
-        self.log.info("seed execution completed", &[]);
+        self.log
+            .info("phase completed", &[("phase", phase.name.as_str())]);
         Ok(())
+    }
+
+    fn wait_for_object(&mut self, wf: &WaitForObject, phase_timeout: u64) -> Result<(), String> {
+        let timeout_secs = wf.timeout.unwrap_or(phase_timeout);
+        let deadline = Instant::now() + Duration::from_secs(timeout_secs);
+        let poll_interval = Duration::from_millis(500);
+
+        self.log.info(
+            "waiting for object",
+            &[
+                ("type", wf.obj_type.as_str()),
+                ("name", wf.name.as_str()),
+                ("timeout", &timeout_secs.to_string()),
+            ],
+        );
+
+        loop {
+            match self.db.object_exists(&wf.obj_type, &wf.name) {
+                Ok(true) => {
+                    self.log.info(
+                        "object found",
+                        &[("type", wf.obj_type.as_str()), ("name", wf.name.as_str())],
+                    );
+                    return Ok(());
+                }
+                Ok(false) => {}
+                Err(e) => {
+                    return Err(format!(
+                        "error checking {} '{}' on {} driver: {}",
+                        wf.obj_type,
+                        wf.name,
+                        self.db.driver_name(),
+                        e
+                    ));
+                }
+            }
+
+            if Instant::now() >= deadline {
+                return Err(format!(
+                    "timeout after {}s waiting for {} '{}'",
+                    timeout_secs, wf.obj_type, wf.name
+                ));
+            }
+
+            std::thread::sleep(poll_interval);
+        }
     }
 
     fn execute_seed_set(&mut self, ss: &SeedSet) -> Result<(), String> {
@@ -88,7 +174,6 @@ impl<'a> SeedExecutor<'a> {
     fn apply_seed_set_tables(&mut self, ss: &SeedSet) -> Result<(), String> {
         let mut tables: Vec<&TableSeed> = ss.tables.iter().collect();
         tables.sort_by_key(|t| t.order);
-
         for ts in &tables {
             self.apply_table_seed(ts)?;
         }
@@ -243,20 +328,21 @@ mod tests {
     #[test]
     fn test_basic_seed_execution() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: basic
-    tables:
-      - table: departments
-        unique_key: [name]
-        auto_id:
-          column: id
-        rows:
-          - name: Engineering
-          - name: Sales
+phases:
+  - name: phase1
+    seed_sets:
+      - name: basic
+        tables:
+          - table: departments
+            unique_key: [name]
+            auto_id:
+              column: id
+            rows:
+              - name: Engineering
+              - name: Sales
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -291,17 +377,18 @@ seed_sets:
     #[test]
     fn test_idempotent_seed() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: idempotent
-    tables:
-      - table: departments
-        unique_key: [name]
-        rows:
-          - name: Engineering
+phases:
+  - name: phase1
+    seed_sets:
+      - name: idempotent
+        tables:
+          - table: departments
+            unique_key: [name]
+            rows:
+              - name: Engineering
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -314,7 +401,6 @@ seed_sets:
         let log = test_logger();
         let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
         executor.execute(&plan).unwrap();
-        // Second execution should skip (already applied)
         executor.execute(&plan).unwrap();
 
         let db = SqliteDb::connect(db_path_str).unwrap();
@@ -337,18 +423,19 @@ seed_sets:
     #[test]
     fn test_unique_key_skip_duplicates() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: dupes
-    tables:
-      - table: departments
-        unique_key: [name]
-        rows:
-          - name: Engineering
-          - name: Engineering
+phases:
+  - name: phase1
+    seed_sets:
+      - name: dupes
+        tables:
+          - table: departments
+            unique_key: [name]
+            rows:
+              - name: Engineering
+              - name: Engineering
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -379,26 +466,27 @@ seed_sets:
     #[test]
     fn test_reference_resolution() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: with_refs
-    tables:
-      - table: departments
-        order: 1
-        auto_id:
-          column: id
-        rows:
-          - _ref: dept_eng
-            name: Engineering
-      - table: employees
-        order: 2
-        rows:
-          - name: Alice
-            email: alice@example.com
-            department_id: "@ref:dept_eng.id"
+phases:
+  - name: phase1
+    seed_sets:
+      - name: with_refs
+        tables:
+          - table: departments
+            order: 1
+            auto_id:
+              column: id
+            rows:
+              - _ref: dept_eng
+                name: Engineering
+          - table: employees
+            order: 2
+            rows:
+              - name: Alice
+                email: alice@example.com
+                department_id: "@ref:dept_eng.id"
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -448,34 +536,35 @@ seed_sets:
     #[test]
     fn test_multiple_references_same_table() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: multi_refs
-    tables:
-      - table: departments
-        order: 1
-        auto_id:
-          column: id
-        rows:
-          - _ref: dept_eng
-            name: Engineering
-          - _ref: dept_sales
-            name: Sales
-      - table: employees
-        order: 2
-        rows:
-          - name: Alice
-            email: alice@example.com
-            department_id: "@ref:dept_eng.id"
-          - name: Bob
-            email: bob@example.com
-            department_id: "@ref:dept_eng.id"
-          - name: Carol
-            email: carol@example.com
-            department_id: "@ref:dept_sales.id"
+phases:
+  - name: phase1
+    seed_sets:
+      - name: multi_refs
+        tables:
+          - table: departments
+            order: 1
+            auto_id:
+              column: id
+            rows:
+              - _ref: dept_eng
+                name: Engineering
+              - _ref: dept_sales
+                name: Sales
+          - table: employees
+            order: 2
+            rows:
+              - name: Alice
+                email: alice@example.com
+                department_id: "@ref:dept_eng.id"
+              - name: Bob
+                email: bob@example.com
+                department_id: "@ref:dept_eng.id"
+              - name: Carol
+                email: carol@example.com
+                department_id: "@ref:dept_sales.id"
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -491,7 +580,6 @@ seed_sets:
 
         let db = SqliteDb::connect(db_path_str).unwrap();
 
-        // Verify 2 departments with different IDs
         let dept_count: i64 = db
             .conn
             .query_row("SELECT COUNT(*) FROM departments", [], |r| r.get(0))
@@ -526,14 +614,12 @@ seed_sets:
             "department IDs should be different between rows"
         );
 
-        // Verify 3 employees
         let emp_count: i64 = db
             .conn
             .query_row("SELECT COUNT(*) FROM employees", [], |r| r.get(0))
             .unwrap();
         assert_eq!(emp_count, 3, "expected 3 employees");
 
-        // Verify Alice -> Engineering
         let alice_dept: Option<i64> = db
             .conn
             .query_row(
@@ -552,7 +638,6 @@ seed_sets:
             "Alice should reference Engineering department"
         );
 
-        // Verify Bob -> Engineering
         let bob_dept: Option<i64> = db
             .conn
             .query_row(
@@ -568,7 +653,6 @@ seed_sets:
             "Bob should reference Engineering department"
         );
 
-        // Verify Carol -> Sales
         let carol_dept: Option<i64> = db
             .conn
             .query_row(
@@ -591,36 +675,22 @@ seed_sets:
     #[test]
     fn test_reset_mode() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: resetable
-    tables:
-      - table: departments
-        unique_key: [name]
-        rows:
-          - name: Engineering
+phases:
+  - name: phase1
+    seed_sets:
+      - name: resetable
+        tables:
+          - table: departments
+            unique_key: [name]
+            rows:
+              - name: Engineering
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        let sqlite = SqliteDb::connect(":memory:").unwrap();
-        setup_db_with_tables(&sqlite);
-
         let log = test_logger();
 
-        // First apply normally
-        {
-            let _executor = SeedExecutor::new(
-                &log,
-                Box::new(SqliteDb::connect(":memory:").unwrap()),
-                "initium_seed".into(),
-                false,
-            );
-            // We need the same db instance, so let's use a file-based approach
-        }
-
-        // Use a temp file for persistence across executor instances
         let dir = tempfile::TempDir::new().unwrap();
         let db_path = dir.path().join("test.db");
         let db_path_str = db_path.to_str().unwrap();
@@ -633,7 +703,6 @@ seed_sets:
         let mut exec1 = SeedExecutor::new(&log, Box::new(db1), "initium_seed".into(), false);
         exec1.execute(&plan).unwrap();
 
-        // Verify row was inserted
         let db_check = SqliteDb::connect(db_path_str).unwrap();
         let count: i64 = db_check
             .conn
@@ -641,12 +710,10 @@ seed_sets:
             .unwrap();
         assert_eq!(count, 1);
 
-        // Now reset
         let db2 = SqliteDb::connect(db_path_str).unwrap();
         let mut exec2 = SeedExecutor::new(&log, Box::new(db2), "initium_seed".into(), true);
         exec2.execute(&plan).unwrap();
 
-        // After reset + re-seed, should still have 1 row
         let db_final = SqliteDb::connect(db_path_str).unwrap();
         let count: i64 = db_final
             .conn
@@ -659,16 +726,17 @@ seed_sets:
     fn test_env_substitution() {
         std::env::set_var("TEST_SEED_DEPT_NAME", "FromEnv");
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: env_test
-    tables:
-      - table: departments
-        rows:
-          - name: "$env:TEST_SEED_DEPT_NAME"
+phases:
+  - name: phase1
+    seed_sets:
+      - name: env_test
+        tables:
+          - table: departments
+            rows:
+              - name: "$env:TEST_SEED_DEPT_NAME"
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -694,23 +762,23 @@ seed_sets:
     #[test]
     fn test_ordering() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: second
-    order: 2
-    tables:
-      - table: departments
-        rows:
-          - name: Dept2
-  - name: first
-    order: 1
-    tables:
-      - table: departments
-        rows:
-          - name: Dept1
+phases:
+  - name: phase1
+    seed_sets:
+      - name: ordered
+        order: 1
+        tables:
+          - table: departments
+            rows:
+              - name: Dept2
+            order: 2
+          - table: departments
+            rows:
+              - name: Dept1
+            order: 1
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -729,9 +797,8 @@ seed_sets:
             .conn
             .query_row("SELECT COUNT(*) FROM departments", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(count, 2, "both seed sets should have been applied");
+        assert_eq!(count, 2, "expected 2 departments");
 
-        // "first" (order=1) runs before "second" (order=2), so Dept1 gets id 1
         let names: Vec<String> = db
             .conn
             .prepare("SELECT name FROM departments ORDER BY id")
@@ -743,22 +810,23 @@ seed_sets:
         assert_eq!(
             names,
             vec!["Dept1", "Dept2"],
-            "seed sets should be applied in order"
+            "Dept1 should be inserted before Dept2"
         );
     }
 
     #[test]
     fn test_empty_rows() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: empty
-    tables:
-      - table: departments
-        rows: []
+phases:
+  - name: phase1
+    seed_sets:
+      - name: empty
+        tables:
+          - table: departments
+            rows: []
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -777,52 +845,56 @@ seed_sets:
             .conn
             .query_row("SELECT COUNT(*) FROM departments", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(
-            count, 0,
-            "no rows should have been inserted for empty rows list"
-        );
+        assert_eq!(count, 0, "no rows should be inserted for empty rows list");
     }
 
     #[test]
     fn test_invalid_reference() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: bad_ref
-    tables:
-      - table: departments
-        rows:
-          - name: "@ref:nonexistent.id"
+phases:
+  - name: phase1
+    seed_sets:
+      - name: bad_ref
+        tables:
+          - table: departments
+            rows:
+              - name: "@ref:nonexistent.id"
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        let sqlite = SqliteDb::connect(":memory:").unwrap();
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
         setup_db_with_tables(&sqlite);
 
         let log = test_logger();
         let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
         let result = executor.execute(&plan);
         assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
     }
 
     #[test]
     fn test_numeric_and_boolean_values() {
         let yaml = r#"
-version: "1"
 database:
   driver: sqlite
   url: ":memory:"
-seed_sets:
-  - name: types
-    tables:
-      - table: config
-        rows:
-          - key: max_retries
-            value: 5
-          - key: enabled
-            value: true
+phases:
+  - name: phase1
+    seed_sets:
+      - name: types
+        tables:
+          - table: config
+            rows:
+              - key: max_retries
+                value: 5
+              - key: debug
+                value: true
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let dir = tempfile::TempDir::new().unwrap();
@@ -840,6 +912,12 @@ seed_sets:
         executor.execute(&plan).unwrap();
 
         let db = SqliteDb::connect(db_path_str).unwrap();
+        let count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM config", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 2);
+
         let rows: Vec<(String, String)> = db
             .conn
             .prepare("SELECT key, value FROM config ORDER BY key")
@@ -848,8 +926,335 @@ seed_sets:
             .unwrap()
             .map(|r| r.unwrap())
             .collect();
-        assert_eq!(rows.len(), 2);
-        assert_eq!(rows[0], ("enabled".to_string(), "true".to_string()));
+        assert_eq!(rows[0], ("debug".to_string(), "true".to_string()));
         assert_eq!(rows[1], ("max_retries".to_string(), "5".to_string()));
+    }
+
+    #[test]
+    fn test_basic_phase_execution() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
+        setup_db_with_tables(&sqlite);
+
+        let yaml = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: phase1
+    seed_sets:
+      - name: initial
+        tables:
+          - table: departments
+            rows:
+              - name: Engineering
+              - name: Sales
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        let log = test_logger();
+        let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
+        executor.execute(&plan).unwrap();
+
+        let db = SqliteDb::connect(db_path_str).unwrap();
+        let count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM departments", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_multiple_phases() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
+        setup_db_with_tables(&sqlite);
+
+        let yaml = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: phase1
+    order: 1
+    seed_sets:
+      - name: depts
+        tables:
+          - table: departments
+            auto_id:
+              column: id
+            rows:
+              - _ref: dept_eng
+                name: Engineering
+  - name: phase2
+    order: 2
+    seed_sets:
+      - name: employees
+        tables:
+          - table: employees
+            rows:
+              - name: Alice
+                email: alice@example.com
+                department_id: "@ref:dept_eng.id"
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        let log = test_logger();
+        let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
+        executor.execute(&plan).unwrap();
+
+        let db = SqliteDb::connect(db_path_str).unwrap();
+        let dept_count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM departments", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(dept_count, 1);
+
+        let emp_count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM employees", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(emp_count, 1);
+
+        let dept_id: i64 = db
+            .conn
+            .query_row("SELECT id FROM departments", [], |r| r.get(0))
+            .unwrap();
+        let emp_dept_id: i64 = db
+            .conn
+            .query_row("SELECT department_id FROM employees", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(dept_id, emp_dept_id, "cross-phase references should work");
+    }
+
+    #[test]
+    fn test_wait_for_existing_table() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
+        setup_db_with_tables(&sqlite);
+
+        let yaml = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: wait_and_seed
+    timeout: 2
+    wait_for:
+      - type: table
+        name: departments
+    seed_sets:
+      - name: data
+        tables:
+          - table: departments
+            rows:
+              - name: Engineering
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        let log = test_logger();
+        let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
+        executor.execute(&plan).unwrap();
+
+        let db = SqliteDb::connect(db_path_str).unwrap();
+        let count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM departments", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_wait_for_timeout() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
+
+        let yaml = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: will_timeout
+    timeout: 1
+    wait_for:
+      - type: table
+        name: nonexistent_table
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        let log = test_logger();
+        let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
+        let result = executor.execute(&plan);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("timeout"),
+            "error should mention timeout: {}",
+            err
+        );
+        assert!(err.contains("nonexistent_table"));
+    }
+
+    #[test]
+    fn test_wait_for_per_object_timeout() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
+
+        let yaml = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: per_obj_timeout
+    timeout: 60
+    wait_for:
+      - type: table
+        name: missing_table
+        timeout: 1
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        let log = test_logger();
+        let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
+        let result = executor.execute(&plan);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("timeout after 1s"));
+    }
+
+    #[test]
+    fn test_create_if_missing_unsupported_on_sqlite() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
+
+        let yaml = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: create_phase
+    database: mydb
+    create_if_missing: true
+    seed_sets:
+      - name: s
+        tables:
+          - table: t
+            rows:
+              - a: b
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        let log = test_logger();
+        let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
+        let result = executor.execute(&plan);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("does not support"),
+            "should report unsupported: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_phase_without_seed_sets() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
+        setup_db_with_tables(&sqlite);
+
+        let yaml = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: wait_only
+    timeout: 2
+    wait_for:
+      - type: table
+        name: departments
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        let log = test_logger();
+        let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
+        executor.execute(&plan).unwrap();
+    }
+
+    #[test]
+    fn test_wait_for_view() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
+        sqlite
+            .conn
+            .execute_batch(
+                "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT);
+                 CREATE VIEW items_view AS SELECT * FROM items;",
+            )
+            .unwrap();
+
+        let yaml = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: view_wait
+    timeout: 2
+    wait_for:
+      - type: view
+        name: items_view
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        let log = test_logger();
+        let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
+        executor.execute(&plan).unwrap();
+    }
+
+    #[test]
+    fn test_wait_for_unsupported_type_on_sqlite() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
+
+        let yaml = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: schema_wait
+    timeout: 2
+    wait_for:
+      - type: schema
+        name: public
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        let log = test_logger();
+        let mut executor = SeedExecutor::new(&log, Box::new(sqlite), "initium_seed".into(), false);
+        let result = executor.execute(&plan);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("does not support"),
+            "should report unsupported: {}",
+            err
+        );
     }
 }
