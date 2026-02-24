@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Helm chart unit tests using helm-unittest plugin (`charts/initium/tests/deployment_test.yaml`) covering deployment rendering, securityContext enforcement, disabled sampleDeployment, multiple initContainers, extraVolumes/extraVolumeMounts, image configuration, workdir mount, and labels
+- `helm unittest` step added to CI helm-lint job with automatic plugin installation
 - Duration unit support for all time parameters (`--timeout`, `--initial-delay`, `--max-delay`, seed phase `timeout`, seed wait-for `timeout`): accepts `ms`, `s`, `m`, `h` suffixes with decimal values (e.g. `1.5m`, `2.7s`) and combined units (e.g. `1m30s`, `2s700ms`, `18h36m4s200ms`); bare numbers default to seconds
 - `src/duration.rs` module with `parse_duration` and `format_duration` utilities
 - Environment variable support for all CLI flags via `INITIUM_*` prefix (e.g., `--json` → `INITIUM_JSON`, `--timeout` → `INITIUM_TIMEOUT`); flag values take precedence over env vars
