@@ -42,11 +42,11 @@ phases:
     database: reporting            # Optional. Database to target/create.
     schema: analytics              # Optional. Schema to target/create.
     create_if_missing: true        # Optional. Create database/schema if missing.
-    timeout: 30                    # Optional. Default wait timeout in seconds (default: 30).
+    timeout: 30s                    # Optional. Default wait timeout (e.g. 30s, 1m; default: 30s).
     wait_for:                      # Optional. Objects to wait for before seeding.
       - type: table                # One of: table, view, schema, database.
         name: users
-        timeout: 60                # Optional. Per-object timeout override.
+        timeout: 60s               # Optional. Per-object timeout override.
     seed_sets:                     # Optional. Seed sets to apply in this phase.
       - name: initial_data
         order: 1                   # Optional. Controls execution order across seed sets.
@@ -76,10 +76,10 @@ phases:
 | `phases[].database`                                | string     | No         | Target database name (for create/switch)                         |
 | `phases[].schema`                                  | string     | No         | Target schema name (for create/switch)                           |
 | `phases[].create_if_missing`                       | boolean    | No         | Create the database/schema if it does not exist (default: false) |
-| `phases[].timeout`                                 | integer    | No         | Default timeout in seconds for wait_for objects (default: 30)    |
+| `phases[].timeout`                                 | string     | No         | Default wait timeout (e.g. `30s`, `1m`, `1m30s`; default: `30s`) |
 | `phases[].wait_for[].type`                         | string     | Yes        | Object type: `table`, `view`, `schema`, or `database`            |
 | `phases[].wait_for[].name`                         | string     | Yes        | Object name to wait for                                          |
-| `phases[].wait_for[].timeout`                      | integer    | No         | Per-object timeout override in seconds                           |
+| `phases[].wait_for[].timeout`                      | string     | No         | Per-object timeout override (e.g. `60s`, `2m`, `1m30s`)          |
 | `phases[].seed_sets[].name`                        | string     | Yes        | Unique name for the seed set (used in tracking)                  |
 | `phases[].seed_sets[].order`                       | integer    | No         | Execution order (lower values first, default: 0)                 |
 | `phases[].seed_sets[].tables[].table`              | string     | Yes        | Target database table name                                       |

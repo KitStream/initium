@@ -47,10 +47,10 @@ initium wait-for --target https://vault:8200/v1/sys/health --insecure-tls
 | Flag               | Default      | Env Var                  | Description                                  |
 | ------------------ | ------------ | ------------------------ | -------------------------------------------- |
 | `--target`         | _(required)_ | `INITIUM_TARGET`         | Target URL (`tcp://`, `http://`, `https://`) |
-| `--timeout`        | `5m`         | `INITIUM_TIMEOUT`        | Overall timeout                              |
+| `--timeout`        | `5m`         | `INITIUM_TIMEOUT`        | Overall timeout (e.g. `30s`, `5m`, `1h`)     |
 | `--max-attempts`   | `60`         | `INITIUM_MAX_ATTEMPTS`   | Max retry attempts                           |
-| `--initial-delay`  | `1s`         | `INITIUM_INITIAL_DELAY`  | Initial retry delay                          |
-| `--max-delay`      | `30s`        | `INITIUM_MAX_DELAY`      | Max retry delay                              |
+| `--initial-delay`  | `1s`         | `INITIUM_INITIAL_DELAY`  | Initial retry delay (e.g. `500ms`, `1s`)     |
+| `--max-delay`      | `30s`        | `INITIUM_MAX_DELAY`      | Max retry delay (e.g. `10s`, `30s`, `1m`)    |
 | `--backoff-factor` | `2.0`        | `INITIUM_BACKOFF_FACTOR` | Exponential backoff multiplier               |
 | `--jitter`         | `0.1`        | `INITIUM_JITTER`         | Jitter fraction (0.0–1.0)                    |
 | `--http-status`    | `200`        | `INITIUM_HTTP_STATUS`    | Expected HTTP status code                    |
@@ -244,10 +244,10 @@ initium fetch --url http://cdn/config --output config.json \
 | `--insecure-tls`               | `false`      | `INITIUM_INSECURE_TLS`               | Skip TLS certificate verification                          |
 | `--follow-redirects`           | `false`      | `INITIUM_FOLLOW_REDIRECTS`           | Follow HTTP redirects                                      |
 | `--allow-cross-site-redirects` | `false`      | `INITIUM_ALLOW_CROSS_SITE_REDIRECTS` | Allow cross-site redirects (requires `--follow-redirects`) |
-| `--timeout`                    | `5m`         | `INITIUM_TIMEOUT`                    | Overall timeout                                            |
+| `--timeout`                    | `5m`         | `INITIUM_TIMEOUT`                    | Overall timeout (e.g. `30s`, `5m`, `1h`)                   |
 | `--max-attempts`               | `3`          | `INITIUM_MAX_ATTEMPTS`               | Maximum retry attempts                                     |
-| `--initial-delay`              | `1s`         | `INITIUM_INITIAL_DELAY`              | Initial delay between retries                              |
-| `--max-delay`                  | `30s`        | `INITIUM_MAX_DELAY`                  | Maximum delay between retries                              |
+| `--initial-delay`              | `1s`         | `INITIUM_INITIAL_DELAY`              | Initial delay between retries (e.g. `500ms`, `1s`)         |
+| `--max-delay`                  | `30s`        | `INITIUM_MAX_DELAY`                  | Maximum delay between retries (e.g. `10s`, `30s`, `1m`)    |
 | `--backoff-factor`             | `2.0`        | `INITIUM_BACKOFF_FACTOR`             | Backoff multiplier                                         |
 | `--jitter`                     | `0.1`        | `INITIUM_JITTER`                     | Jitter fraction (0.0–1.0)                                  |
 | `--json`                       | `false`      | `INITIUM_JSON`                       | Enable JSON log output                                     |
@@ -369,6 +369,8 @@ initContainers:
 | `--json` | `false` | `INITIUM_JSON` | Enable JSON-formatted log output |
 
 All flags can be set via environment variables. Flag values take precedence over environment variables. Boolean env vars accept `true`/`false`, `1`/`0`, `yes`/`no`. The `INITIUM_TARGET` env var accepts comma-separated values for multiple targets.
+
+**Duration format:** All time parameters (`--timeout`, `--initial-delay`, `--max-delay`) accept values with optional time unit suffixes: `ms` (milliseconds), `s` (seconds), `m` (minutes), `h` (hours). Decimal values are supported (e.g. `1.5m`, `2.7s`). Multiple units can be combined (e.g. `1m30s`, `2s700ms`, `18h36m4s200ms`). Bare numbers without a unit are treated as seconds. Examples: `30s`, `5m`, `1h`, `500ms`, `1m30s`, `120` (= 120 seconds).
 
 ## Exit Codes
 

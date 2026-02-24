@@ -13,7 +13,7 @@ fn test_env_var_fallback_for_json_flag() {
             "--target",
             "tcp://localhost:1",
             "--timeout",
-            "1",
+            "1s",
             "--max-attempts",
             "1",
         ])
@@ -31,7 +31,7 @@ fn test_env_var_fallback_for_json_flag() {
 
 #[test]
 fn test_env_var_fallback_for_timeout() {
-    // INITIUM_TIMEOUT=1 should set timeout to 1 second
+    // INITIUM_TIMEOUT=1s should set timeout to 1 second
     let output = Command::new(initium_bin())
         .args([
             "wait-for",
@@ -40,7 +40,7 @@ fn test_env_var_fallback_for_timeout() {
             "--max-attempts",
             "1",
         ])
-        .env("INITIUM_TIMEOUT", "1")
+        .env("INITIUM_TIMEOUT", "1s")
         .output()
         .unwrap();
     // Should exit non-zero (connection failure), but the timeout was accepted
@@ -51,7 +51,7 @@ fn test_env_var_fallback_for_timeout() {
 fn test_env_var_fallback_for_target() {
     // INITIUM_TARGET should set the target endpoints
     let output = Command::new(initium_bin())
-        .args(["wait-for", "--timeout", "1", "--max-attempts", "1"])
+        .args(["wait-for", "--timeout", "1s", "--max-attempts", "1"])
         .env("INITIUM_TARGET", "tcp://localhost:1")
         .output()
         .unwrap();
@@ -68,7 +68,7 @@ fn test_env_var_fallback_for_target() {
 fn test_env_var_multiple_targets_comma_separated() {
     // INITIUM_TARGET with comma-separated values
     let output = Command::new(initium_bin())
-        .args(["wait-for", "--timeout", "1", "--max-attempts", "1"])
+        .args(["wait-for", "--timeout", "1s", "--max-attempts", "1"])
         .env("INITIUM_TARGET", "tcp://localhost:1,tcp://localhost:2")
         .output()
         .unwrap();
@@ -82,18 +82,18 @@ fn test_env_var_multiple_targets_comma_separated() {
 
 #[test]
 fn test_flag_takes_precedence_over_env_var() {
-    // --timeout flag (1) should override INITIUM_TIMEOUT env var (9999)
+    // --timeout flag (1s) should override INITIUM_TIMEOUT env var (999m)
     let output = Command::new(initium_bin())
         .args([
             "wait-for",
             "--target",
             "tcp://localhost:1",
             "--timeout",
-            "1",
+            "1s",
             "--max-attempts",
             "1",
         ])
-        .env("INITIUM_TIMEOUT", "9999")
+        .env("INITIUM_TIMEOUT", "999m")
         .output()
         .unwrap();
     // If env var took precedence, the process would run for ~2.7 hours.
@@ -110,7 +110,7 @@ fn test_env_var_fallback_for_insecure_tls() {
             "--target",
             "tcp://localhost:1",
             "--timeout",
-            "1",
+            "1s",
             "--max-attempts",
             "1",
         ])
@@ -176,7 +176,7 @@ fn test_env_var_false_boolean_not_set() {
             "--target",
             "tcp://localhost:1",
             "--timeout",
-            "1",
+            "1s",
             "--max-attempts",
             "1",
         ])

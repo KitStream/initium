@@ -27,7 +27,7 @@ phases:
   # Phase 2: Wait for tables to be created by migrations, then seed
   - name: seed_departments
     order: 2
-    timeout: 60
+    timeout: 60s
     wait_for:
       - type: table
         name: departments

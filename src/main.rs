@@ -1,4 +1,5 @@
 mod cmd;
+mod duration;
 mod logging;
 mod render;
 mod retry;
@@ -6,7 +7,6 @@ mod safety;
 mod seed;
 
 use clap::{Parser, Subcommand};
-use std::time::Duration;
 
 #[derive(Parser)]
 #[command(
@@ -44,11 +44,11 @@ enum Commands {
         target: Vec<String>,
         #[arg(
             long,
-            default_value = "300",
+            default_value = "5m",
             env = "INITIUM_TIMEOUT",
-            help = "Overall timeout in seconds"
+            help = "Overall timeout (e.g. 30s, 5m, 1h)"
         )]
-        timeout: u64,
+        timeout: String,
         #[arg(
             long,
             default_value = "60",
@@ -58,18 +58,18 @@ enum Commands {
         max_attempts: u32,
         #[arg(
             long,
-            default_value = "1000",
+            default_value = "1s",
             env = "INITIUM_INITIAL_DELAY",
-            help = "Initial delay in milliseconds"
+            help = "Initial retry delay (e.g. 500ms, 1s, 5s)"
         )]
-        initial_delay: u64,
+        initial_delay: String,
         #[arg(
             long,
-            default_value = "30000",
+            default_value = "30s",
             env = "INITIUM_MAX_DELAY",
-            help = "Maximum delay in milliseconds"
+            help = "Maximum retry delay (e.g. 10s, 30s, 1m)"
         )]
-        max_delay: u64,
+        max_delay: String,
         #[arg(
             long,
             default_value = "2.0",
@@ -205,11 +205,11 @@ enum Commands {
         allow_cross_site_redirects: bool,
         #[arg(
             long,
-            default_value = "300",
+            default_value = "5m",
             env = "INITIUM_TIMEOUT",
-            help = "Timeout in seconds"
+            help = "Overall timeout (e.g. 30s, 5m, 1h)"
         )]
-        timeout: u64,
+        timeout: String,
         #[arg(
             long,
             default_value = "3",
@@ -219,18 +219,18 @@ enum Commands {
         max_attempts: u32,
         #[arg(
             long,
-            default_value = "1000",
+            default_value = "1s",
             env = "INITIUM_INITIAL_DELAY",
-            help = "Initial delay in ms"
+            help = "Initial retry delay (e.g. 500ms, 1s, 5s)"
         )]
-        initial_delay: u64,
+        initial_delay: String,
         #[arg(
             long,
-            default_value = "30000",
+            default_value = "30s",
             env = "INITIUM_MAX_DELAY",
-            help = "Max delay in ms"
+            help = "Maximum retry delay (e.g. 10s, 30s, 1m)"
         )]
-        max_delay: u64,
+        max_delay: String,
         #[arg(
             long,
             default_value = "2.0",
@@ -279,27 +279,24 @@ fn main() {
             jitter,
             http_status,
             insecure_tls,
-        } => {
+        } => (|| {
+            let timeout_dur = duration::parse_duration(&timeout)
+                .map_err(|e| format!("invalid --timeout: {}", e))?;
+            let initial_delay_dur = duration::parse_duration(&initial_delay)
+                .map_err(|e| format!("invalid --initial-delay: {}", e))?;
+            let max_delay_dur = duration::parse_duration(&max_delay)
+                .map_err(|e| format!("invalid --max-delay: {}", e))?;
             let cfg = retry::Config {
                 max_attempts,
-                initial_delay: Duration::from_millis(initial_delay),
-                max_delay: Duration::from_millis(max_delay),
+                initial_delay: initial_delay_dur,
+                max_delay: max_delay_dur,
                 backoff_factor,
                 jitter_fraction: jitter,
             };
-            if let Err(e) = cfg.validate() {
-                Err(format!("invalid retry config: {}", e))
-            } else {
-                cmd::wait_for::run(
-                    &log,
-                    &target,
-                    &cfg,
-                    Duration::from_secs(timeout),
-                    http_status,
-                    insecure_tls,
-                )
-            }
-        }
+            cfg.validate()
+                .map_err(|e| format!("invalid retry config: {}", e))?;
+            cmd::wait_for::run(&log, &target, &cfg, timeout_dur, http_status, insecure_tls)
+        })(),
         Commands::Migrate {
             workdir,
             lock_file,
@@ -326,7 +323,13 @@ fn main() {
             max_delay,
             backoff_factor,
             jitter,
-        } => {
+        } => (|| {
+            let timeout_dur = duration::parse_duration(&timeout)
+                .map_err(|e| format!("invalid --timeout: {}", e))?;
+            let initial_delay_dur = duration::parse_duration(&initial_delay)
+                .map_err(|e| format!("invalid --initial-delay: {}", e))?;
+            let max_delay_dur = duration::parse_duration(&max_delay)
+                .map_err(|e| format!("invalid --max-delay: {}", e))?;
             let fetch_cfg = cmd::fetch::Config {
                 url,
                 output,
@@ -335,21 +338,20 @@ fn main() {
                 insecure_tls,
                 follow_redirects,
                 allow_cross_site_redirects,
-                timeout: Duration::from_secs(timeout),
+                timeout: timeout_dur,
             };
             let retry_cfg = retry::Config {
                 max_attempts,
-                initial_delay: Duration::from_millis(initial_delay),
-                max_delay: Duration::from_millis(max_delay),
+                initial_delay: initial_delay_dur,
+                max_delay: max_delay_dur,
                 backoff_factor,
                 jitter_fraction: jitter,
             };
-            if let Err(e) = retry_cfg.validate() {
-                Err(format!("invalid retry config: {}", e))
-            } else {
-                cmd::fetch::run(&log, &fetch_cfg, &retry_cfg)
-            }
-        }
+            retry_cfg
+                .validate()
+                .map_err(|e| format!("invalid retry config: {}", e))?;
+            cmd::fetch::run(&log, &fetch_cfg, &retry_cfg)
+        })(),
         Commands::Exec { workdir, args } => cmd::exec::run(&log, &args, &workdir),
     };
 

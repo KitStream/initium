@@ -75,13 +75,13 @@ pub struct SeedPhase {
     #[serde(default)]
     pub wait_for: Vec<WaitForObject>,
     #[serde(default = "default_phase_timeout")]
-    pub timeout: u64,
+    pub timeout: String,
     #[serde(default)]
     pub seed_sets: Vec<SeedSet>,
 }
 
-fn default_phase_timeout() -> u64 {
-    30
+fn default_phase_timeout() -> String {
+    "30s".into()
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -90,7 +90,7 @@ pub struct WaitForObject {
     pub obj_type: String,
     pub name: String,
     #[serde(default)]
-    pub timeout: Option<u64>,
+    pub timeout: Option<String>,
 }
 
 impl SeedPlan {
@@ -396,7 +396,7 @@ phases:
         assert_eq!(plan.phases[0].wait_for.len(), 1);
         assert_eq!(plan.phases[0].wait_for[0].obj_type, "table");
         assert_eq!(plan.phases[0].wait_for[0].name, "config");
-        assert_eq!(plan.phases[0].timeout, 10);
+        assert_eq!(plan.phases[0].timeout, "10");
         assert_eq!(plan.phases[0].seed_sets.len(), 1);
     }
 
@@ -505,7 +505,7 @@ phases:
               - a: b
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        assert_eq!(plan.phases[0].timeout, 30);
+        assert_eq!(plan.phases[0].timeout, "30s");
     }
 
     #[test]
@@ -532,7 +532,7 @@ phases:
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         let wf = &plan.phases[0].wait_for;
-        assert_eq!(wf[0].timeout, Some(120));
+        assert_eq!(wf[0].timeout, Some("120".to_string()));
         assert_eq!(wf[1].timeout, None);
     }
 
