@@ -318,22 +318,18 @@ impl Database for PostgresDb {
             .iter()
             .map(|c| format!("\"{}\"", sanitize_identifier(c)))
             .collect();
-        let placeholders: Vec<String> = (1..=values.len()).map(|i| format!("${}", i)).collect();
+        let value_list: Vec<String> = values.iter().map(|v| escape_sql_value(v)).collect();
         let returning_col = sanitize_identifier(auto_id_column.unwrap_or("id"));
         let sql = format!(
             "INSERT INTO \"{}\" ({}) VALUES ({}) RETURNING COALESCE(CAST(\"{}\" AS BIGINT), 0)",
             sanitize_identifier(table),
             col_list.join(", "),
-            placeholders.join(", "),
+            value_list.join(", "),
             returning_col
         );
-        let params: Vec<&(dyn postgres::types::ToSql + Sync)> = values
-            .iter()
-            .map(|v| v as &(dyn postgres::types::ToSql + Sync))
-            .collect();
         let row = self
             .client
-            .query_one(&sql, params.as_slice())
+            .query_one(&sql, &[])
             .map_err(|e| format!("inserting row into '{}': {}", table, e))?;
         let id: i64 = row.get(0);
         Ok(Some(id))
@@ -350,21 +346,17 @@ impl Database for PostgresDb {
         }
         let conditions: Vec<String> = unique_columns
             .iter()
-            .enumerate()
-            .map(|(i, c)| format!("\"{}\" = ${}", sanitize_identifier(c), i + 1))
+            .zip(unique_values.iter())
+            .map(|(c, v)| format!("\"{}\" = {}", sanitize_identifier(c), escape_sql_value(v)))
             .collect();
         let sql = format!(
             "SELECT COUNT(*) FROM \"{}\" WHERE {}",
             sanitize_identifier(table),
             conditions.join(" AND ")
         );
-        let params: Vec<&(dyn postgres::types::ToSql + Sync)> = unique_values
-            .iter()
-            .map(|v| v as &(dyn postgres::types::ToSql + Sync))
-            .collect();
         let row = self
             .client
-            .query_one(&sql, params.as_slice())
+            .query_one(&sql, &[])
             .map_err(|e| format!("checking row existence in '{}': {}", table, e))?;
         let count: i64 = row.get(0);
         Ok(count > 0)
@@ -715,6 +707,10 @@ fn sanitize_identifier(name: &str) -> String {
     name.chars()
         .filter(|c| c.is_alphanumeric() || *c == '_')
         .collect()
+}
+
+fn escape_sql_value(val: &str) -> String {
+    format!("'{}'", val.replace('\'', "''"))
 }
 
 #[cfg(test)]
