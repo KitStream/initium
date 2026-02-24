@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Seed executor tests now verify data actually arrived in the database after execution, using file-based SQLite and post-execution queries to assert row counts, column values, cross-table references, env substitution, ordering, and edge cases
 
 ### Fixed
+- Updated Dockerfiles (`Dockerfile`, `jyq.Dockerfile`) from `rust:1.85-alpine` to `rust:1.88-alpine` to fix release workflow failure caused by `time@0.3.47` requiring rustc 1.88.0
 - Aligned all markdown table columns across documentation files (`FAQ.md`, `README.md`, `docs/security.md`, `docs/seeding.md`, `docs/usage.md`)
 - Fixed clippy `collapsible_if` lint in seed executor's unique key check
 - Removed dead code: unused `src/cmd/seed.rs` module (replaced by `src/seed/`)
@@ -50,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI framework changed from cobra to clap
 - Template engine changed from Go text/template to minijinja (Jinja2-style); access env vars via `{{ env.VAR }}`
 - CI/CD workflows updated for Rust toolchain (cargo test, clippy, rustfmt)
-- Dockerfiles updated to use rust:1.85-alpine builder with musl static linking
+- Dockerfiles updated to use rust:1.88-alpine builder with musl static linking
 
 ### Added
 - `exec` subcommand: run arbitrary commands with structured logging, exit code forwarding, and optional `--workdir` for child process working directory

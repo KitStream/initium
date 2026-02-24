@@ -1,4 +1,4 @@
-FROM rust:1.85-alpine AS builder
+FROM rust:1.88-alpine AS builder
 ARG VERSION=dev
 RUN apk add --no-cache musl-dev
 WORKDIR /src
