@@ -319,20 +319,34 @@ impl Database for PostgresDb {
             .map(|c| format!("\"{}\"", sanitize_identifier(c)))
             .collect();
         let value_list: Vec<String> = values.iter().map(|v| escape_sql_value(v)).collect();
-        let returning_col = sanitize_identifier(auto_id_column.unwrap_or("id"));
-        let sql = format!(
-            "INSERT INTO \"{}\" ({}) VALUES ({}) RETURNING COALESCE(CAST(\"{}\" AS BIGINT), 0)",
-            sanitize_identifier(table),
-            col_list.join(", "),
-            value_list.join(", "),
-            returning_col
-        );
-        let row = self
-            .client
-            .query_one(&sql, &[])
-            .map_err(|e| format!("inserting row into '{}': {}", table, e))?;
-        let id: i64 = row.get(0);
-        Ok(Some(id))
+
+        if let Some(auto_col) = auto_id_column {
+            let returning_col = sanitize_identifier(auto_col);
+            let sql = format!(
+                "INSERT INTO \"{}\" ({}) VALUES ({}) RETURNING COALESCE(CAST(\"{}\" AS BIGINT), 0)",
+                sanitize_identifier(table),
+                col_list.join(", "),
+                value_list.join(", "),
+                returning_col
+            );
+            let row = self
+                .client
+                .query_one(&sql, &[])
+                .map_err(|e| format!("inserting row into '{}': {}", table, e))?;
+            let id: i64 = row.get(0);
+            Ok(Some(id))
+        } else {
+            let sql = format!(
+                "INSERT INTO \"{}\" ({}) VALUES ({})",
+                sanitize_identifier(table),
+                col_list.join(", "),
+                value_list.join(", "),
+            );
+            self.client
+                .execute(&sql, &[])
+                .map_err(|e| format!("inserting row into '{}': {}", table, e))?;
+            Ok(None)
+        }
     }
 
     fn row_exists(
