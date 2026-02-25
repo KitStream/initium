@@ -364,11 +364,38 @@ initContainers:
 
 ## Global Flags
 
-| Flag     | Default | Env Var        | Description                      |
-| -------- | ------- | -------------- | -------------------------------- |
-| `--json` | `false` | `INITIUM_JSON` | Enable JSON-formatted log output |
+| Flag        | Default | Env Var            | Description                                                  |
+| ----------- | ------- | ------------------ | ------------------------------------------------------------ |
+| `--json`    | `false` | `INITIUM_JSON`     | Enable JSON-formatted log output                             |
+| `--sidecar` | `false` | `INITIUM_SIDECAR`  | Keep process alive after task completion (sidecar containers) |
 
 All flags can be set via environment variables. Flag values take precedence over environment variables. Boolean env vars accept `true`/`false`, `1`/`0`, `yes`/`no`. The `INITIUM_TARGET` env var accepts comma-separated values for multiple targets.
+
+### Sidecar mode
+
+When running initium as a Kubernetes sidecar container (rather than an init container), use `--sidecar` to keep the process alive after tasks complete. Without this flag, the process exits on success, which causes Kubernetes to restart the sidecar container in a loop.
+
+```bash
+# Via flag
+initium --sidecar wait-for --target tcp://postgres:5432
+
+# Via environment variable
+INITIUM_SIDECAR=true initium seed --spec /seeds/seed.yaml
+```
+
+**Behavior:**
+
+- On **success**: logs completion, then sleeps indefinitely
+- On **failure**: exits with code `1` immediately (does not sleep)
+
+```yaml
+# Kubernetes sidecar example (requires K8s 1.29+)
+containers:
+  - name: initium-sidecar
+    image: ghcr.io/kitstream/initium:latest
+    restartPolicy: Always
+    args: ["--sidecar", "wait-for", "--target", "tcp://postgres:5432"]
+```
 
 **Duration format:** All time parameters (`--timeout`, `--initial-delay`, `--max-delay`) accept values with optional time unit suffixes: `ms` (milliseconds), `s` (seconds), `m` (minutes), `h` (hours). Decimal values are supported (e.g. `1.5m`, `2.7s`). Multiple units can be combined (e.g. `1m30s`, `2s700ms`, `18h36m4s200ms`). Bare numbers without a unit are treated as seconds. Examples: `30s`, `5m`, `1h`, `500ms`, `1m30s`, `120` (= 120 seconds).
 

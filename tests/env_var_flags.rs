@@ -1,4 +1,5 @@
 use std::process::Command;
+use std::time::{Duration, Instant};
 
 fn initium_bin() -> String {
     env!("CARGO_BIN_EXE_initium").to_string()
@@ -237,5 +238,124 @@ fn test_env_var_false_boolean_not_set() {
         !stderr.contains("\"msg\""),
         "expected text output when INITIUM_JSON=false, got: {}",
         stderr
+    );
+}
+
+#[test]
+fn test_sidecar_flag_on_failure_exits_immediately() {
+    // --sidecar should NOT keep the process alive when the subcommand fails
+    let start = Instant::now();
+    let output = Command::new(initium_bin())
+        .args([
+            "--sidecar",
+            "wait-for",
+            "--target",
+            "tcp://localhost:1",
+            "--timeout",
+            "1s",
+            "--max-attempts",
+            "1",
+        ])
+        .output()
+        .unwrap();
+    let elapsed = start.elapsed();
+    assert!(
+        !output.status.success(),
+        "expected failure exit code with --sidecar on error"
+    );
+    // Should exit quickly (well under 10s), not sleep
+    assert!(
+        elapsed < Duration::from_secs(10),
+        "sidecar should not sleep on failure, took {:?}",
+        elapsed
+    );
+}
+
+#[test]
+fn test_sidecar_flag_on_success_sleeps() {
+    // --sidecar on a successful command should keep the process alive.
+    // We use `exec -- true` which succeeds immediately, then verify the
+    // process is still running after a short delay.
+    let mut child = Command::new(initium_bin())
+        .args(["--sidecar", "exec", "--", "true"])
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    // Wait briefly to give the process time to complete the subcommand
+    std::thread::sleep(Duration::from_secs(2));
+
+    // The process should still be running (sidecar sleep)
+    let status = child.try_wait().unwrap();
+    assert!(
+        status.is_none(),
+        "expected sidecar process to still be running, but it exited: {:?}",
+        status
+    );
+
+    // Clean up: kill the process
+    child.kill().unwrap();
+    child.wait().unwrap();
+}
+
+#[test]
+fn test_sidecar_env_var() {
+    // INITIUM_SIDECAR=true should enable sidecar mode via env var
+    let mut child = Command::new(initium_bin())
+        .args(["exec", "--", "true"])
+        .env("INITIUM_SIDECAR", "true")
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    std::thread::sleep(Duration::from_secs(2));
+
+    let status = child.try_wait().unwrap();
+    assert!(
+        status.is_none(),
+        "expected sidecar process to still be running via env var, but it exited: {:?}",
+        status
+    );
+
+    child.kill().unwrap();
+    child.wait().unwrap();
+}
+
+#[test]
+fn test_sidecar_logs_message_on_success() {
+    // --sidecar should log "sidecar mode" message on success
+    let mut child = Command::new(initium_bin())
+        .args(["--sidecar", "exec", "--", "true"])
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    std::thread::sleep(Duration::from_secs(2));
+
+    // Kill and collect stderr
+    child.kill().unwrap();
+    let output = child.wait_with_output().unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("sidecar mode"),
+        "expected sidecar mode log message, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_without_sidecar_exits_on_success() {
+    // Without --sidecar, a successful command should exit immediately
+    let start = Instant::now();
+    let output = Command::new(initium_bin())
+        .args(["exec", "--", "true"])
+        .output()
+        .unwrap();
+    let elapsed = start.elapsed();
+    assert!(output.status.success(), "exec true should succeed");
+    assert!(
+        elapsed < Duration::from_secs(5),
+        "without --sidecar, process should exit immediately, took {:?}",
+        elapsed
     );
 }

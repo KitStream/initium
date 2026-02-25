@@ -15,7 +15,7 @@ fn initium_bin() -> String {
 }
 
 fn integration_enabled() -> bool {
-    std::env::var("INTEGRATION").map_or(false, |v| v == "1")
+    std::env::var("INTEGRATION").is_ok_and(|v| v == "1")
 }
 
 fn input_dir() -> String {
