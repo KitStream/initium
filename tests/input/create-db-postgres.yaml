@@ -1,0 +1,15 @@
+database:
+  driver: postgres
+  url_env: POSTGRES_URL
+  tracking_table: initium_seed
+
+phases:
+  - name: create_db
+    order: 1
+    database: initium_created_db
+    create_if_missing: true
+    seed_sets:
+      - name: placeholder
+        tables:
+          - table: departments
+            rows: []

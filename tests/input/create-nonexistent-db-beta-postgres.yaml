@@ -1,0 +1,10 @@
+database:
+  driver: postgres
+  url_env: POSTGRES_URL
+  tracking_table: initium_seed
+
+phases:
+  - name: create_beta
+    order: 1
+    database: initium_noexist_beta
+    create_if_missing: true

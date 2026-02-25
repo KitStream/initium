@@ -18,24 +18,30 @@ fn integration_enabled() -> bool {
     std::env::var("INTEGRATION").map_or(false, |v| v == "1")
 }
 
-fn fixtures_dir() -> String {
+fn input_dir() -> String {
     let manifest = env!("CARGO_MANIFEST_DIR");
-    format!("{}/tests/fixtures", manifest)
+    format!("{}/tests/input", manifest)
 }
 
+#[cfg(feature = "postgres")]
 const PG_URL: &str = "postgres://initium:initium@localhost:15432/initium_test";
+#[cfg(feature = "mysql")]
 const MYSQL_URL_STR: &str = "mysql://initium:initium@localhost:13306/initium_test";
+#[cfg(feature = "mysql")]
 const MYSQL_ROOT_URL_STR: &str = "mysql://root:rootpass@localhost:13306/initium_test";
 
+#[cfg(feature = "postgres")]
 fn pg_client() -> postgres::Client {
     postgres::Client::connect(PG_URL, postgres::NoTls).expect("failed to connect to postgres")
 }
 
+#[cfg(feature = "mysql")]
 fn mysql_conn() -> mysql::PooledConn {
     let pool = mysql::Pool::new(MYSQL_URL_STR).expect("failed to connect to mysql");
     pool.get_conn().expect("failed to get mysql connection")
 }
 
+#[cfg(feature = "mysql")]
 fn mysql_root_conn() -> mysql::PooledConn {
     let pool = mysql::Pool::new(MYSQL_ROOT_URL_STR).expect("failed to connect to mysql as root");
     pool.get_conn()
@@ -215,7 +221,7 @@ fn test_render_template() {
         return;
     }
     let workdir = tempfile::TempDir::new().expect("failed to create tempdir");
-    let template = format!("{}/template.conf.tmpl", fixtures_dir());
+    let template = format!("{}/template.conf.tmpl", input_dir());
 
     let out = Command::new(initium_bin())
         .args([
@@ -335,6 +341,7 @@ fn test_exec_failing_command() {
 // ---------------------------------------------------------------------------
 // seed: PostgreSQL — create tables, seed, verify
 // ---------------------------------------------------------------------------
+#[cfg(feature = "postgres")]
 #[test]
 fn test_seed_postgres() {
     if !integration_enabled() {
@@ -352,7 +359,7 @@ fn test_seed_postgres() {
         )
         .expect("failed to create postgres tables");
 
-    let spec = format!("{}/seed-postgres.yaml", fixtures_dir());
+    let spec = format!("{}/seed-postgres.yaml", input_dir());
     let out = Command::new(initium_bin())
         .args(["seed", "--spec", &spec])
         .env("POSTGRES_URL", PG_URL)
@@ -448,6 +455,7 @@ fn test_seed_postgres() {
 // ---------------------------------------------------------------------------
 // seed: MySQL — create tables, seed, verify
 // ---------------------------------------------------------------------------
+#[cfg(feature = "mysql")]
 #[test]
 fn test_seed_mysql() {
     if !integration_enabled() {
@@ -469,7 +477,7 @@ fn test_seed_mysql() {
     )
     .unwrap();
 
-    let spec = format!("{}/seed-mysql.yaml", fixtures_dir());
+    let spec = format!("{}/seed-mysql.yaml", input_dir());
     let out = Command::new(initium_bin())
         .args(["seed", "--spec", &spec])
         .env("MYSQL_URL", MYSQL_URL_STR)
@@ -540,6 +548,7 @@ fn test_seed_mysql() {
 // ---------------------------------------------------------------------------
 // seed: PostgreSQL — create database via seed phase
 // ---------------------------------------------------------------------------
+#[cfg(feature = "postgres")]
 #[test]
 fn test_seed_postgres_create_database() {
     if !integration_enabled() {
@@ -549,16 +558,9 @@ fn test_seed_postgres_create_database() {
     let mut client = pg_client();
     let _ = client.batch_execute("DROP DATABASE IF EXISTS initium_created_db");
 
-    let workdir = tempfile::TempDir::new().expect("failed to create tempdir");
-    let spec_path = workdir.path().join("create-db-seed.yaml");
-    std::fs::write(
-        &spec_path,
-        "database:\n  driver: postgres\n  url_env: POSTGRES_URL\n  tracking_table: initium_seed\n\nphases:\n  - name: create_db\n    order: 1\n    database: initium_created_db\n    create_if_missing: true\n    seed_sets:\n      - name: placeholder\n        tables:\n          - table: departments\n            rows: []\n",
-    )
-    .expect("failed to write spec");
-
+    let spec = format!("{}/create-db-postgres.yaml", input_dir());
     let out = Command::new(initium_bin())
-        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .args(["seed", "--spec", &spec])
         .env("POSTGRES_URL", PG_URL)
         .output()
         .expect("failed to run seed");
@@ -585,7 +587,7 @@ fn test_seed_postgres_create_database() {
 
     // Idempotent re-run
     let out = Command::new(initium_bin())
-        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .args(["seed", "--spec", &spec])
         .env("POSTGRES_URL", PG_URL)
         .output()
         .expect("failed to re-run seed");
@@ -600,6 +602,7 @@ fn test_seed_postgres_create_database() {
 // ---------------------------------------------------------------------------
 // seed: PostgreSQL — create schema via seed phase
 // ---------------------------------------------------------------------------
+#[cfg(feature = "postgres")]
 #[test]
 fn test_seed_postgres_create_schema() {
     if !integration_enabled() {
@@ -609,16 +612,9 @@ fn test_seed_postgres_create_schema() {
     let mut client = pg_client();
     let _ = client.batch_execute("DROP SCHEMA IF EXISTS test_analytics CASCADE");
 
-    let workdir = tempfile::TempDir::new().expect("failed to create tempdir");
-    let spec_path = workdir.path().join("create-schema-seed.yaml");
-    std::fs::write(
-        &spec_path,
-        "database:\n  driver: postgres\n  url_env: POSTGRES_URL\n  tracking_table: initium_seed\n\nphases:\n  - name: create_schema\n    order: 1\n    schema: test_analytics\n    create_if_missing: true\n    seed_sets:\n      - name: placeholder\n        tables:\n          - table: departments\n            rows: []\n",
-    )
-    .expect("failed to write spec");
-
+    let spec = format!("{}/create-schema-postgres.yaml", input_dir());
     let out = Command::new(initium_bin())
-        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .args(["seed", "--spec", &spec])
         .env("POSTGRES_URL", PG_URL)
         .output()
         .expect("failed to run seed");
@@ -649,6 +645,7 @@ fn test_seed_postgres_create_schema() {
 // ---------------------------------------------------------------------------
 // seed: MySQL — create database via seed phase
 // ---------------------------------------------------------------------------
+#[cfg(feature = "mysql")]
 #[test]
 fn test_seed_mysql_create_database() {
     if !integration_enabled() {
@@ -659,16 +656,9 @@ fn test_seed_mysql_create_database() {
     let mut conn = mysql_root_conn();
     let _ = conn.query_drop("DROP DATABASE IF EXISTS initium_created_db");
 
-    let workdir = tempfile::TempDir::new().expect("failed to create tempdir");
-    let spec_path = workdir.path().join("create-db-seed.yaml");
-    std::fs::write(
-        &spec_path,
-        "database:\n  driver: mysql\n  url_env: MYSQL_URL\n  tracking_table: initium_seed\n\nphases:\n  - name: create_db\n    order: 1\n    database: initium_created_db\n    create_if_missing: true\n    seed_sets:\n      - name: placeholder\n        tables:\n          - table: products\n            rows: []\n",
-    )
-    .expect("failed to write spec");
-
+    let spec = format!("{}/create-db-mysql.yaml", input_dir());
     let out = Command::new(initium_bin())
-        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .args(["seed", "--spec", &spec])
         .env("MYSQL_URL", MYSQL_ROOT_URL_STR)
         .output()
         .expect("failed to run seed");
@@ -689,7 +679,7 @@ fn test_seed_mysql_create_database() {
 
     // Idempotent re-run
     let out = Command::new(initium_bin())
-        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .args(["seed", "--spec", &spec])
         .env("MYSQL_URL", MYSQL_ROOT_URL_STR)
         .output()
         .expect("failed to re-run seed");
@@ -704,6 +694,7 @@ fn test_seed_mysql_create_database() {
 // ---------------------------------------------------------------------------
 // seed: PostgreSQL — create non-existing database and seed data into it
 // ---------------------------------------------------------------------------
+#[cfg(feature = "postgres")]
 #[test]
 fn test_seed_postgres_create_nonexistent_db_alpha() {
     if !integration_enabled() {
@@ -723,16 +714,9 @@ fn test_seed_postgres_create_nonexistent_db_alpha() {
         .get(0);
     assert_eq!(count, 0, "database should not exist before test");
 
-    let workdir = tempfile::TempDir::new().expect("failed to create tempdir");
-    let spec_path = workdir.path().join("create-db-alpha.yaml");
-    std::fs::write(
-        &spec_path,
-        "database:\n  driver: postgres\n  url_env: POSTGRES_URL\n  tracking_table: initium_seed\n\nphases:\n  - name: create_alpha\n    order: 1\n    database: initium_noexist_alpha\n    create_if_missing: true\n    seed_sets:\n      - name: placeholder\n        tables:\n          - table: departments\n            rows: []\n",
-    )
-    .expect("failed to write spec");
-
+    let spec = format!("{}/create-nonexistent-db-alpha-postgres.yaml", input_dir());
     let out = Command::new(initium_bin())
-        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .args(["seed", "--spec", &spec])
         .env("POSTGRES_URL", PG_URL)
         .output()
         .expect("failed to run seed");
@@ -764,6 +748,7 @@ fn test_seed_postgres_create_nonexistent_db_alpha() {
 // ---------------------------------------------------------------------------
 // seed: PostgreSQL — create a second non-existing database with different name
 // ---------------------------------------------------------------------------
+#[cfg(feature = "postgres")]
 #[test]
 fn test_seed_postgres_create_nonexistent_db_beta() {
     if !integration_enabled() {
@@ -783,16 +768,9 @@ fn test_seed_postgres_create_nonexistent_db_beta() {
         .get(0);
     assert_eq!(count, 0, "database should not exist before test");
 
-    let workdir = tempfile::TempDir::new().expect("failed to create tempdir");
-    let spec_path = workdir.path().join("create-db-beta.yaml");
-    std::fs::write(
-        &spec_path,
-        "database:\n  driver: postgres\n  url_env: POSTGRES_URL\n  tracking_table: initium_seed\n\nphases:\n  - name: create_beta\n    order: 1\n    database: initium_noexist_beta\n    create_if_missing: true\n    seed_sets:\n      - name: placeholder\n        tables:\n          - table: departments\n            rows: []\n",
-    )
-    .expect("failed to write spec");
-
+    let spec = format!("{}/create-nonexistent-db-beta-postgres.yaml", input_dir());
     let out = Command::new(initium_bin())
-        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .args(["seed", "--spec", &spec])
         .env("POSTGRES_URL", PG_URL)
         .output()
         .expect("failed to run seed");
@@ -820,7 +798,7 @@ fn test_seed_postgres_create_nonexistent_db_beta() {
 
     // Re-run to verify idempotency — should not fail
     let out = Command::new(initium_bin())
-        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .args(["seed", "--spec", &spec])
         .env("POSTGRES_URL", PG_URL)
         .output()
         .expect("failed to re-run seed");
@@ -835,6 +813,7 @@ fn test_seed_postgres_create_nonexistent_db_beta() {
 // ---------------------------------------------------------------------------
 // seed: MySQL — create non-existing database and verify
 // ---------------------------------------------------------------------------
+#[cfg(feature = "mysql")]
 #[test]
 fn test_seed_mysql_create_nonexistent_db_alpha() {
     if !integration_enabled() {
@@ -854,16 +833,9 @@ fn test_seed_mysql_create_nonexistent_db_alpha() {
         .unwrap();
     assert_eq!(count, Some(0), "database should not exist before test");
 
-    let workdir = tempfile::TempDir::new().expect("failed to create tempdir");
-    let spec_path = workdir.path().join("create-db-alpha.yaml");
-    std::fs::write(
-        &spec_path,
-        "database:\n  driver: mysql\n  url_env: MYSQL_URL\n  tracking_table: initium_seed\n\nphases:\n  - name: create_alpha\n    order: 1\n    database: initium_noexist_alpha\n    create_if_missing: true\n    seed_sets:\n      - name: placeholder\n        tables:\n          - table: products\n            rows: []\n",
-    )
-    .expect("failed to write spec");
-
+    let spec = format!("{}/create-nonexistent-db-alpha-mysql.yaml", input_dir());
     let out = Command::new(initium_bin())
-        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .args(["seed", "--spec", &spec])
         .env("MYSQL_URL", MYSQL_ROOT_URL_STR)
         .output()
         .expect("failed to run seed");
@@ -889,6 +861,7 @@ fn test_seed_mysql_create_nonexistent_db_alpha() {
 // ---------------------------------------------------------------------------
 // seed: MySQL — create a second non-existing database with different name
 // ---------------------------------------------------------------------------
+#[cfg(feature = "mysql")]
 #[test]
 fn test_seed_mysql_create_nonexistent_db_beta() {
     if !integration_enabled() {
@@ -908,16 +881,9 @@ fn test_seed_mysql_create_nonexistent_db_beta() {
         .unwrap();
     assert_eq!(count, Some(0), "database should not exist before test");
 
-    let workdir = tempfile::TempDir::new().expect("failed to create tempdir");
-    let spec_path = workdir.path().join("create-db-beta.yaml");
-    std::fs::write(
-        &spec_path,
-        "database:\n  driver: mysql\n  url_env: MYSQL_URL\n  tracking_table: initium_seed\n\nphases:\n  - name: create_beta\n    order: 1\n    database: initium_noexist_beta\n    create_if_missing: true\n    seed_sets:\n      - name: placeholder\n        tables:\n          - table: products\n            rows: []\n",
-    )
-    .expect("failed to write spec");
-
+    let spec = format!("{}/create-nonexistent-db-beta-mysql.yaml", input_dir());
     let out = Command::new(initium_bin())
-        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .args(["seed", "--spec", &spec])
         .env("MYSQL_URL", MYSQL_ROOT_URL_STR)
         .output()
         .expect("failed to run seed");
@@ -939,7 +905,7 @@ fn test_seed_mysql_create_nonexistent_db_beta() {
 
     // Re-run to verify idempotency — should not fail
     let out = Command::new(initium_bin())
-        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .args(["seed", "--spec", &spec])
         .env("MYSQL_URL", MYSQL_ROOT_URL_STR)
         .output()
         .expect("failed to re-run seed");
