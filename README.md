@@ -207,6 +207,20 @@ initContainers:
         value: postgres
 ```
 
+### How do I run initium as a sidecar container?
+
+Use the `--sidecar` global flag to keep the process alive after tasks complete:
+
+```yaml
+containers:
+  - name: initium-sidecar
+    image: ghcr.io/kitstream/initium:latest
+    restartPolicy: Always
+    args: ["--sidecar", "wait-for", "--target", "tcp://postgres:5432"]
+```
+
+The process sleeps indefinitely after success. On failure it exits with code `1` immediately.
+
 ### How do I get JSON logs?
 
 Add the `--json` global flag:

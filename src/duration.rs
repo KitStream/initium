@@ -197,7 +197,7 @@ mod tests {
         );
         assert_eq!(
             parse_duration("18h36m4s200ms").unwrap(),
-            Duration::from_millis(18 * 3600_000 + 36 * 60_000 + 4_000 + 200)
+            Duration::from_millis(18 * 3_600_000 + 36 * 60_000 + 4_000 + 200)
         );
         assert_eq!(parse_duration("1h30m").unwrap(), Duration::from_secs(5400));
         assert_eq!(

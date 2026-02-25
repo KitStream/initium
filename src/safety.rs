@@ -55,7 +55,7 @@ mod tests {
     #[test]
     fn test_traversal_rejected() {
         let dir = TempDir::new().unwrap();
-        let traversal = ["..", "..", "..", "tmp", "x"].join(&std::path::MAIN_SEPARATOR.to_string());
+        let traversal = ["..", "..", "..", "tmp", "x"].join(std::path::MAIN_SEPARATOR_STR);
         let result = validate_file_path(dir.path().to_str().unwrap(), &traversal);
         assert!(result.is_err());
     }

@@ -27,6 +27,14 @@ struct Cli {
     )]
     json: bool,
 
+    #[arg(
+        long,
+        global = true,
+        env = "INITIUM_SIDECAR",
+        help = "Keep process alive after task completion (for sidecar containers)"
+    )]
+    sidecar: bool,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -359,5 +367,15 @@ fn main() {
     if let Err(e) = result {
         log.error(&e, &[]);
         std::process::exit(1);
+    }
+
+    if cli.sidecar {
+        log.info(
+            "tasks completed, entering sidecar mode (sleeping indefinitely)",
+            &[],
+        );
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(3600));
+        }
     }
 }
