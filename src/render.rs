@@ -63,6 +63,7 @@ pub fn template_render(input: &str) -> Result<String, String> {
     let env_map: std::collections::HashMap<String, String> = env::vars().collect();
     let mut jinja_env = minijinja::Environment::new();
     jinja_env.set_undefined_behavior(minijinja::UndefinedBehavior::Lenient);
+    crate::template_funcs::register(&mut jinja_env);
     jinja_env
         .add_template("t", input)
         .map_err(|e| format!("parsing template: {}", e))?;

@@ -1,0 +1,10 @@
+{# Example: using sha256 and base64 template filters #}
+
+[checksums]
+config_hash = {{ env.CONFIG_DATA | sha256 }}
+
+[secrets]
+db_password = {{ env.DB_PASSWORD | base64_encode }}
+
+[chained]
+password_hash_b64 = {{ env.DB_PASSWORD | sha256 | base64_encode }}
