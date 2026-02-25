@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Custom MiniJinja template filters: `sha256`, `base64_encode`, `base64_decode` available in all templates (render and seed spec files)
+- `sha256` filter with optional `mode` parameter (`"hex"` default, `"bytes"` for byte array output)
+- `base64_encode` / `base64_decode` filters for standard Base64 encoding and decoding with error handling for invalid input
+- Filters are chainable: e.g. `{{ "data" | sha256 | base64_encode }}`
+- `src/template_funcs.rs` dedicated module for template utility functions, designed for easy extension
+- `docs/templating.md` documenting all template filters with usage patterns, chaining examples, and error reference
+- `examples/template-functions/config.tmpl` example demonstrating sha256 and base64 filters
+- Unit tests for sha256 (hex, bytes, empty, invalid mode), base64 (encode, decode, roundtrip, invalid input), and template integration (filter chaining)
+
 ### Changed
 - Clarified that seed phases with only `create_if_missing` can omit the `seed_sets` field entirely (`seed_sets` defaults to empty via `#[serde(default)]`); updated integration test YAML specs accordingly
 

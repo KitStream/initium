@@ -1009,6 +1009,7 @@ dependencies = [
 name = "initium"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "clap",
  "minijinja",
  "mysql",
@@ -1019,6 +1020,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "sha2",
  "tempfile",
  "tiny_http",
  "ureq",

@@ -24,6 +24,8 @@ rand = "0.8"
 ureq = { version = "2", features = ["tls"], default-features = false }
 rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
 minijinja = "2"
+sha2 = "0.10"
+base64 = "0.22"
 rusqlite = { version = "0.31", features = ["bundled"], optional = true }
 postgres = { version = "0.19", optional = true }
 mysql = { version = "25", optional = true }

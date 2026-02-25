@@ -5,6 +5,7 @@ mod render;
 mod retry;
 mod safety;
 mod seed;
+mod template_funcs;
 
 use clap::{Parser, Subcommand};
 
