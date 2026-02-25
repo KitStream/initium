@@ -7,11 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Removed placeholder `seed_sets` from create-if-missing integration test YAML files; phases with only `create_if_missing` no longer need empty seed sets (`seed_sets` was already optional via `#[serde(default)]`)
+
 ### Added
 - Integration tests with docker-compose for end-to-end testing against real Postgres 16, MySQL 8.0, and nginx services (`tests/integration_test.rs`): wait-for TCP/HTTP/timeout/multiple targets, render template, fetch HTTP, exec command, seed PostgreSQL and MySQL with cross-table reference verification, create database/schema, idempotency, and reset mode
 - Additional create-if-missing integration tests: 2 PostgreSQL and 2 MySQL tests using known non-existing database names (`initium_noexist_alpha`, `initium_noexist_beta`) to verify database creation, existence checks, and idempotent re-runs
 - `tests/docker-compose.yml` with Postgres, MySQL, and HTTP health-check server definitions
-- `tests/fixtures/` with seed spec files and template for integration tests
+- `tests/input/` with seed spec files and template for integration tests
 - Separate GitHub Actions workflow (`.github/workflows/integration.yml`) for integration tests with service containers
 - Helm chart unit tests using helm-unittest plugin (`charts/initium/tests/deployment_test.yaml`) covering deployment rendering, securityContext enforcement, disabled sampleDeployment, multiple initContainers, extraVolumes/extraVolumeMounts, image configuration, workdir mount, and labels
 - `helm unittest` step added to CI helm-lint job with automatic plugin installation

@@ -1,0 +1,15 @@
+database:
+  driver: mysql
+  url_env: MYSQL_URL
+  tracking_table: initium_seed
+
+phases:
+  - name: create_db
+    order: 1
+    database: initium_created_db
+    create_if_missing: true
+    seed_sets:
+      - name: placeholder
+        tables:
+          - table: products
+            rows: []

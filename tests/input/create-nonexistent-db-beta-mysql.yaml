@@ -1,0 +1,10 @@
+database:
+  driver: mysql
+  url_env: MYSQL_URL
+  tracking_table: initium_seed
+
+phases:
+  - name: create_beta
+    order: 1
+    database: initium_noexist_beta
+    create_if_missing: true
