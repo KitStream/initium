@@ -307,6 +307,11 @@ impl Database for PostgresDb {
         Ok(())
     }
 
+    // Seed values are untyped strings that may target columns of any type
+    // (INTEGER, TEXT, etc.). Parameterized queries with $N send values as
+    // TEXT, which postgres cannot implicitly cast to other types. String
+    // literals have type `unknown` and auto-cast to the target column type,
+    // so we use escaped literals here. Identifiers are still sanitized.
     fn insert_row(
         &mut self,
         table: &str,

@@ -23,19 +23,25 @@ fn input_dir() -> String {
     format!("{}/tests/input", manifest)
 }
 
+#[cfg(feature = "postgres")]
 const PG_URL: &str = "postgres://initium:initium@localhost:15432/initium_test";
+#[cfg(feature = "mysql")]
 const MYSQL_URL_STR: &str = "mysql://initium:initium@localhost:13306/initium_test";
+#[cfg(feature = "mysql")]
 const MYSQL_ROOT_URL_STR: &str = "mysql://root:rootpass@localhost:13306/initium_test";
 
+#[cfg(feature = "postgres")]
 fn pg_client() -> postgres::Client {
     postgres::Client::connect(PG_URL, postgres::NoTls).expect("failed to connect to postgres")
 }
 
+#[cfg(feature = "mysql")]
 fn mysql_conn() -> mysql::PooledConn {
     let pool = mysql::Pool::new(MYSQL_URL_STR).expect("failed to connect to mysql");
     pool.get_conn().expect("failed to get mysql connection")
 }
 
+#[cfg(feature = "mysql")]
 fn mysql_root_conn() -> mysql::PooledConn {
     let pool = mysql::Pool::new(MYSQL_ROOT_URL_STR).expect("failed to connect to mysql as root");
     pool.get_conn()
@@ -335,6 +341,7 @@ fn test_exec_failing_command() {
 // ---------------------------------------------------------------------------
 // seed: PostgreSQL — create tables, seed, verify
 // ---------------------------------------------------------------------------
+#[cfg(feature = "postgres")]
 #[test]
 fn test_seed_postgres() {
     if !integration_enabled() {
@@ -448,6 +455,7 @@ fn test_seed_postgres() {
 // ---------------------------------------------------------------------------
 // seed: MySQL — create tables, seed, verify
 // ---------------------------------------------------------------------------
+#[cfg(feature = "mysql")]
 #[test]
 fn test_seed_mysql() {
     if !integration_enabled() {
@@ -540,6 +548,7 @@ fn test_seed_mysql() {
 // ---------------------------------------------------------------------------
 // seed: PostgreSQL — create database via seed phase
 // ---------------------------------------------------------------------------
+#[cfg(feature = "postgres")]
 #[test]
 fn test_seed_postgres_create_database() {
     if !integration_enabled() {
@@ -593,6 +602,7 @@ fn test_seed_postgres_create_database() {
 // ---------------------------------------------------------------------------
 // seed: PostgreSQL — create schema via seed phase
 // ---------------------------------------------------------------------------
+#[cfg(feature = "postgres")]
 #[test]
 fn test_seed_postgres_create_schema() {
     if !integration_enabled() {
@@ -635,6 +645,7 @@ fn test_seed_postgres_create_schema() {
 // ---------------------------------------------------------------------------
 // seed: MySQL — create database via seed phase
 // ---------------------------------------------------------------------------
+#[cfg(feature = "mysql")]
 #[test]
 fn test_seed_mysql_create_database() {
     if !integration_enabled() {
@@ -683,6 +694,7 @@ fn test_seed_mysql_create_database() {
 // ---------------------------------------------------------------------------
 // seed: PostgreSQL — create non-existing database and seed data into it
 // ---------------------------------------------------------------------------
+#[cfg(feature = "postgres")]
 #[test]
 fn test_seed_postgres_create_nonexistent_db_alpha() {
     if !integration_enabled() {
@@ -736,6 +748,7 @@ fn test_seed_postgres_create_nonexistent_db_alpha() {
 // ---------------------------------------------------------------------------
 // seed: PostgreSQL — create a second non-existing database with different name
 // ---------------------------------------------------------------------------
+#[cfg(feature = "postgres")]
 #[test]
 fn test_seed_postgres_create_nonexistent_db_beta() {
     if !integration_enabled() {
@@ -800,6 +813,7 @@ fn test_seed_postgres_create_nonexistent_db_beta() {
 // ---------------------------------------------------------------------------
 // seed: MySQL — create non-existing database and verify
 // ---------------------------------------------------------------------------
+#[cfg(feature = "mysql")]
 #[test]
 fn test_seed_mysql_create_nonexistent_db_alpha() {
     if !integration_enabled() {
@@ -847,6 +861,7 @@ fn test_seed_mysql_create_nonexistent_db_alpha() {
 // ---------------------------------------------------------------------------
 // seed: MySQL — create a second non-existing database with different name
 // ---------------------------------------------------------------------------
+#[cfg(feature = "mysql")]
 #[test]
 fn test_seed_mysql_create_nonexistent_db_beta() {
     if !integration_enabled() {

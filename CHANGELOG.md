@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- Removed placeholder `seed_sets` from create-if-missing integration test YAML files; phases with only `create_if_missing` no longer need empty seed sets (`seed_sets` was already optional via `#[serde(default)]`)
+- Clarified that seed phases with only `create_if_missing` can omit the `seed_sets` field entirely (`seed_sets` defaults to empty via `#[serde(default)]`); updated integration test YAML specs accordingly
 
 ### Added
 - Integration tests with docker-compose for end-to-end testing against real Postgres 16, MySQL 8.0, and nginx services (`tests/integration_test.rs`): wait-for TCP/HTTP/timeout/multiple targets, render template, fetch HTTP, exec command, seed PostgreSQL and MySQL with cross-table reference verification, create database/schema, idempotency, and reset mode
