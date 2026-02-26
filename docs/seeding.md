@@ -6,11 +6,11 @@ Seed spec files are MiniJinja templates: they are rendered with environment vari
 
 ## Supported Databases
 
-| Driver       | Connection URL format                            |
-| ------------ | ------------------------------------------------ |
-| `postgres`   | `postgres://user:pass@host:5432/dbname`          |
-| `mysql`      | `mysql://user:pass@host:3306/dbname`             |
-| `sqlite`     | `/path/to/database.db` or `:memory:` for tests   |
+| Driver     | Connection URL format                          |
+| ---------- | ---------------------------------------------- |
+| `postgres` | `postgres://user:pass@host:5432/dbname`        |
+| `mysql`    | `mysql://user:pass@host:3306/dbname`           |
+| `sqlite`   | `/path/to/database.db` or `:memory:` for tests |
 
 ## Quick Start
 
@@ -65,47 +65,47 @@ phases:
 
 ### Field reference
 
-| Field                                              | Type       | Required   | Description                                                      |
-| -------------------------------------------------- | ---------- | ---------- | ---------------------------------------------------------------- |
-| `database.driver`                                  | string     | Yes        | Database driver: `postgres`, `mysql`, or `sqlite`                |
-| `database.url`                                     | string     | No         | Direct database connection URL                                   |
-| `database.url_env`                                 | string     | No         | Environment variable containing the database URL                 |
-| `database.tracking_table`                          | string     | No         | Name of the seed tracking table (default: `initium_seed`)        |
-| `phases[].name`                                    | string     | Yes        | Unique phase name                                                |
-| `phases[].order`                                   | integer    | No         | Execution order (lower first, default: 0)                        |
-| `phases[].database`                                | string     | No         | Target database name (for create/switch)                         |
-| `phases[].schema`                                  | string     | No         | Target schema name (for create/switch)                           |
-| `phases[].create_if_missing`                       | boolean    | No         | Create the database/schema if it does not exist (default: false) |
-| `phases[].timeout`                                 | string     | No         | Default wait timeout (e.g. `30s`, `1m`, `1m30s`; default: `30s`) |
-| `phases[].wait_for[].type`                         | string     | Yes        | Object type: `table`, `view`, `schema`, or `database`            |
-| `phases[].wait_for[].name`                         | string     | Yes        | Object name to wait for                                          |
-| `phases[].wait_for[].timeout`                      | string     | No         | Per-object timeout override (e.g. `60s`, `2m`, `1m30s`)          |
-| `phases[].seed_sets[].name`                        | string     | Yes        | Unique name for the seed set (used in tracking)                  |
-| `phases[].seed_sets[].order`                       | integer    | No         | Execution order (lower values first, default: 0)                 |
-| `phases[].seed_sets[].tables[].table`              | string     | Yes        | Target database table name                                       |
-| `phases[].seed_sets[].tables[].order`              | integer    | No         | Execution order within the seed set (default: 0)                 |
-| `phases[].seed_sets[].tables[].unique_key`         | string[]   | No         | Columns for duplicate detection                                  |
-| `phases[].seed_sets[].tables[].auto_id.column`     | string     | No         | Auto-generated ID column name                                    |
-| `phases[].seed_sets[].tables[].auto_id.id_type`    | string     | No         | ID type (default: `integer`)                                     |
-| `phases[].seed_sets[].tables[].rows[]._ref`        | string     | No         | Internal reference name for cross-table references               |
+| Field                                           | Type     | Required | Description                                                      |
+| ----------------------------------------------- | -------- | -------- | ---------------------------------------------------------------- |
+| `database.driver`                               | string   | Yes      | Database driver: `postgres`, `mysql`, or `sqlite`                |
+| `database.url`                                  | string   | No       | Direct database connection URL                                   |
+| `database.url_env`                              | string   | No       | Environment variable containing the database URL                 |
+| `database.tracking_table`                       | string   | No       | Name of the seed tracking table (default: `initium_seed`)        |
+| `phases[].name`                                 | string   | Yes      | Unique phase name                                                |
+| `phases[].order`                                | integer  | No       | Execution order (lower first, default: 0)                        |
+| `phases[].database`                             | string   | No       | Target database name (for create/switch)                         |
+| `phases[].schema`                               | string   | No       | Target schema name (for create/switch)                           |
+| `phases[].create_if_missing`                    | boolean  | No       | Create the database/schema if it does not exist (default: false) |
+| `phases[].timeout`                              | string   | No       | Default wait timeout (e.g. `30s`, `1m`, `1m30s`; default: `30s`) |
+| `phases[].wait_for[].type`                      | string   | Yes      | Object type: `table`, `view`, `schema`, or `database`            |
+| `phases[].wait_for[].name`                      | string   | Yes      | Object name to wait for                                          |
+| `phases[].wait_for[].timeout`                   | string   | No       | Per-object timeout override (e.g. `60s`, `2m`, `1m30s`)          |
+| `phases[].seed_sets[].name`                     | string   | Yes      | Unique name for the seed set (used in tracking)                  |
+| `phases[].seed_sets[].order`                    | integer  | No       | Execution order (lower values first, default: 0)                 |
+| `phases[].seed_sets[].tables[].table`           | string   | Yes      | Target database table name                                       |
+| `phases[].seed_sets[].tables[].order`           | integer  | No       | Execution order within the seed set (default: 0)                 |
+| `phases[].seed_sets[].tables[].unique_key`      | string[] | No       | Columns for duplicate detection                                  |
+| `phases[].seed_sets[].tables[].auto_id.column`  | string   | No       | Auto-generated ID column name                                    |
+| `phases[].seed_sets[].tables[].auto_id.id_type` | string   | No       | ID type (default: `integer`)                                     |
+| `phases[].seed_sets[].tables[].rows[]._ref`     | string   | No       | Internal reference name for cross-table references               |
 
 ### Wait-for object support by driver
 
-| Object type   | SQLite   | PostgreSQL   | MySQL   |
-| ------------- | -------- | ------------ | ------- |
-| `table`       | ✅        | ✅            | ✅       |
-| `view`        | ✅        | ✅            | ✅       |
-| `schema`      | ❌        | ✅            | ✅*      |
-| `database`    | ❌        | ✅            | ✅*      |
+| Object type | SQLite | PostgreSQL | MySQL |
+| ----------- | ------ | ---------- | ----- |
+| `table`     | ✅      | ✅          | ✅     |
+| `view`      | ✅      | ✅          | ✅     |
+| `schema`    | ❌      | ✅          | ✅*    |
+| `database`  | ❌      | ✅          | ✅*    |
 
 \* In MySQL, `schema` and `database` are synonymous.
 
 ### Create-if-missing support by driver
 
-| Operation           | SQLite   | PostgreSQL   | MySQL   |
-| ------------------- | -------- | ------------ | ------- |
-| `CREATE DATABASE`   | ❌        | ✅            | ✅       |
-| `CREATE SCHEMA`     | ❌        | ✅            | ✅*      |
+| Operation         | SQLite | PostgreSQL | MySQL |
+| ----------------- | ------ | ---------- | ----- |
+| `CREATE DATABASE` | ❌      | ✅          | ✅     |
+| `CREATE SCHEMA`   | ❌      | ✅          | ✅*    |
 
 \* In MySQL, `CREATE SCHEMA` maps to `CREATE DATABASE`.
 
@@ -276,30 +276,30 @@ spec:
 
 ## CLI Reference
 
-| Flag        | Default      | Description                             |
-| ----------- | ------------ | --------------------------------------- |
-| `--spec`    | (required)   | Path to seed spec file (YAML or JSON)   |
-| `--reset`   | `false`      | Delete existing data and re-apply seeds |
-| `--json`    | `false`      | Enable JSON log output                  |
+| Flag      | Default    | Description                             |
+| --------- | ---------- | --------------------------------------- |
+| `--spec`  | (required) | Path to seed spec file (YAML or JSON)   |
+| `--reset` | `false`    | Delete existing data and re-apply seeds |
+| `--json`  | `false`    | Enable JSON log output                  |
 
 ## Failure Modes
 
-| Scenario                                | Behavior                                                 |
-| --------------------------------------- | -------------------------------------------------------- |
-| Invalid spec file                       | Fails with parse error before connecting to database     |
-| Invalid MiniJinja template              | Fails with template syntax error before parsing YAML     |
-| Database unreachable                    | Fails with connection error                              |
-| Unsupported driver                      | Fails with descriptive error listing supported drivers   |
-| Missing env var for URL                 | Fails with error naming the missing variable             |
-| Missing env var in `$env:`              | Fails with error naming the missing variable             |
-| Unresolved `@ref:`                      | Fails with error naming the missing reference            |
-| Row insertion failure                   | Entire seed set rolled back via transaction              |
-| Duplicate row (with unique_key)         | Row silently skipped                                     |
-| Already-applied seed set                | Seed set silently skipped                                |
-| Wait-for object timeout                 | Fails with structured timeout error naming the object    |
-| Unsupported object type for driver      | Fails immediately with driver-specific error             |
-| CREATE DATABASE on SQLite               | Fails with "not supported" error                         |
-| CREATE SCHEMA on SQLite                 | Fails with "not supported" error                         |
+| Scenario                           | Behavior                                               |
+| ---------------------------------- | ------------------------------------------------------ |
+| Invalid spec file                  | Fails with parse error before connecting to database   |
+| Invalid MiniJinja template         | Fails with template syntax error before parsing YAML   |
+| Database unreachable               | Fails with connection error                            |
+| Unsupported driver                 | Fails with descriptive error listing supported drivers |
+| Missing env var for URL            | Fails with error naming the missing variable           |
+| Missing env var in `$env:`         | Fails with error naming the missing variable           |
+| Unresolved `@ref:`                 | Fails with error naming the missing reference          |
+| Row insertion failure              | Entire seed set rolled back via transaction            |
+| Duplicate row (with unique_key)    | Row silently skipped                                   |
+| Already-applied seed set           | Seed set silently skipped                              |
+| Wait-for object timeout            | Fails with structured timeout error naming the object  |
+| Unsupported object type for driver | Fails immediately with driver-specific error           |
+| CREATE DATABASE on SQLite          | Fails with "not supported" error                       |
+| CREATE SCHEMA on SQLite            | Fails with "not supported" error                       |
 
 ## Examples
 
