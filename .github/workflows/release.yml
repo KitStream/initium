@@ -16,7 +16,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --all
       - name: Publish to crates.io
-        run: cargo publish
+        run: |
+          cargo publish 2>&1 || {
+            if cargo search initium --limit 1 | grep -q "$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')"; then
+              echo "::warning::Version already published to crates.io — skipping"
+            else
+              echo "::error::cargo publish failed"
+              exit 1
+            fi
+          }
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
       - uses: docker/setup-qemu-action@v3
