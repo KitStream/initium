@@ -7,6 +7,19 @@ Initium replaces fragile bash scripts in your initContainers with a single, secu
 [![CI](https://github.com/kitstream/initium/actions/workflows/ci.yml/badge.svg)](https://github.com/kitstream/initium/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
+## Features
+
+- **Single static binary** — zero runtime dependencies, built `FROM scratch`
+- **Tiny image** — ~1.8 MB multi-arch container (amd64 + arm64)
+- **Zero CVEs** — no OS packages, no shell, no attack surface
+- **PSA `restricted` compatible** — runs as non-root (UID 65534), read-only filesystem, all capabilities dropped
+- **Sidecar mode** — `--sidecar` flag keeps the process alive for use as a Kubernetes sidecar container
+- **Structured logging** — JSON or text output with automatic secret redaction
+- **Retries with backoff** — exponential backoff, jitter, and configurable deadlines on all network operations
+- **Declarative database seeding** — YAML/JSON specs with MiniJinja templating, cross-table references, and idempotency
+- **Multi-database support** — PostgreSQL, MySQL, and SQLite drivers (optional Cargo features)
+- **Environment variable config** — all flags configurable via `INITIUM_*` env vars
+
 ## Quickstart
 
 ### Wait for Postgres before starting your app
@@ -313,6 +326,20 @@ helm install my-app charts/initium \
   --set 'initContainers[0].args[1]=tcp://postgres:5432'
 ```
 
+## Alternatives
+
+Initium was built to address limitations in existing init container tools:
+
+| Tool                                                                        | Language | Image size  | Multi-tool | Database seeding | Security posture        |
+| --------------------------------------------------------------------------- | -------- | ----------- | ---------- | ---------------- | ----------------------- |
+| **Initium**                                                                 | Rust     | ~1.8 MB     | Yes        | Yes              | PSA `restricted`, no OS |
+| [wait-for-it](https://github.com/vishnubob/wait-for-it)                    | Bash     | Needs shell | No         | No               | Requires shell + netcat |
+| [dockerize](https://github.com/jwilder/dockerize)                          | Go       | ~17 MB      | Partial    | No               | Full OS image           |
+| [k8s-wait-for](https://github.com/groundnuty/k8s-wait-for)                | Bash     | Needs shell | No         | No               | Requires shell + kubectl|
+| [wait4x](https://github.com/atkrad/wait4x)                                | Go       | ~12 MB      | No         | No               | Minimal OS              |
+
+If you only need TCP/HTTP readiness checks, any of these tools work. Initium is designed for teams that also need migrations, seeding, config rendering, and secret fetching in a single security-hardened binary.
+
 ## Documentation
 
 - [FAQ](FAQ.md) — Common questions about functionality, security, and deployment
@@ -322,7 +349,7 @@ helm install my-app charts/initium \
 
 ## Contributing
 
-Contributions are welcome! Please see the [design doc](docs/design.md) for how to add new subcommands.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions, test commands, and PR expectations. See the [design doc](docs/design.md) for how to add new subcommands.
 
 ## License
 
