@@ -4,6 +4,12 @@ version = "0.1.0"
 edition = "2021"
 description = "Swiss-army toolbox for Kubernetes initContainers"
 license = "Apache-2.0"
+repository = "https://github.com/KitStream/initium"
+homepage = "https://github.com/KitStream/initium"
+documentation = "https://github.com/KitStream/initium/blob/main/docs/usage.md"
+keywords = ["kubernetes", "initcontainer", "sidecar", "container", "devops"]
+categories = ["command-line-utilities", "development-tools"]
+readme = "README.md"
 
 [[bin]]
 name = "initium"
