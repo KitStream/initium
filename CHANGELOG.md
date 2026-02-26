@@ -67,7 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Updated Dockerfiles (`Dockerfile`, `jyq.Dockerfile`) from `rust:1.85-alpine` to `rust:1.88-alpine` to fix release workflow failure caused by `time@0.3.47` requiring rustc 1.88.0
-- Aligned all markdown table columns across documentation files (`FAQ.md`, `README.md`, `docs/security.md`, `docs/seeding.md`, `docs/usage.md`)
+- Aligned all markdown table columns across documentation files (`FAQ.md`, `README.md`, `docs/seeding.md`, `docs/templating.md`, `docs/usage.md`, `tests/README.md`)
 - Fixed clippy `collapsible_if` lint in seed executor's unique key check
 - Removed dead code: unused `src/cmd/seed.rs` module (replaced by `src/seed/`)
 - Suppressed unused field warning on `AutoIdConfig.id_type` (reserved for future use)

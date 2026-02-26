@@ -88,11 +88,11 @@ initium migrate --lock-file .migrated --workdir /work -- /app/migrate up
 
 **Flags:**
 
-| Flag          | Default   | Env Var              | Description                                                 |
-| ------------- | --------- | -------------------- | ----------------------------------------------------------- |
-| `--workdir`   | `/work`   | `INITIUM_WORKDIR`    | Working directory for file operations                       |
-| `--lock-file` | _(none)_  | `INITIUM_LOCK_FILE`  | Skip migration if this file exists in workdir (idempotency) |
-| `--json`      | `false`   | `INITIUM_JSON`       | Enable JSON log output                                      |
+| Flag          | Default  | Env Var             | Description                                                 |
+| ------------- | -------- | ------------------- | ----------------------------------------------------------- |
+| `--workdir`   | `/work`  | `INITIUM_WORKDIR`   | Working directory for file operations                       |
+| `--lock-file` | _(none)_ | `INITIUM_LOCK_FILE` | Skip migration if this file exists in workdir (idempotency) |
+| `--json`      | `false`  | `INITIUM_JSON`      | Enable JSON log output                                      |
 
 **Behavior:**
 
@@ -107,11 +107,11 @@ initium migrate --lock-file .migrated --workdir /work -- /app/migrate up
 
 **Exit codes:**
 
-| Code   | Meaning                                        |
-| ------ | ---------------------------------------------- |
-| `0`    | Migration succeeded (or skipped via lock file) |
-| `1`    | Migration command failed, or invalid arguments |
-| _N_    | Forwarded from the migration command           |
+| Code | Meaning                                        |
+| ---- | ---------------------------------------------- |
+| `0`  | Migration succeeded (or skipped via lock file) |
+| `1`  | Migration command failed, or invalid arguments |
+| _N_  | Forwarded from the migration command           |
 
 ### seed
 
@@ -134,11 +134,11 @@ initium seed --spec /seeds/seed.yaml --json
 
 **Flags:**
 
-| Flag      | Default      | Env Var            | Description                             |
-| --------- | ------------ | ------------------ | --------------------------------------- |
-| `--spec`  | _(required)_ | `INITIUM_SPEC`     | Path to seed spec file (YAML or JSON)   |
-| `--reset` | `false`      | `INITIUM_RESET`    | Delete existing data and re-apply seeds |
-| `--json`  | `false`      | `INITIUM_JSON`     | Enable JSON log output                  |
+| Flag      | Default      | Env Var         | Description                             |
+| --------- | ------------ | --------------- | --------------------------------------- |
+| `--spec`  | _(required)_ | `INITIUM_SPEC`  | Path to seed spec file (YAML or JSON)   |
+| `--reset` | `false`      | `INITIUM_RESET` | Delete existing data and re-apply seeds |
+| `--json`  | `false`      | `INITIUM_JSON`  | Enable JSON log output                  |
 
 **Behavior:**
 
@@ -156,10 +156,10 @@ initium seed --spec /seeds/seed.yaml --json
 
 **Exit codes:**
 
-| Code   | Meaning                                             |
-| ------ | --------------------------------------------------- |
-| `0`    | Seed plan applied successfully                      |
-| `1`    | Invalid spec, database error, or missing references |
+| Code | Meaning                                             |
+| ---- | --------------------------------------------------- |
+| `0`  | Seed plan applied successfully                      |
+| `1`  | Invalid spec, database error, or missing references |
 
 See [seeding.md](seeding.md) for the full schema reference, features, and Kubernetes examples.
 
@@ -190,20 +190,20 @@ initium render --template /tpl/db.conf.tmpl --output config/db.conf --workdir /w
 
 **Flags:**
 
-| Flag         | Default      | Env Var             | Description                               |
-| ------------ | ------------ | ------------------- | ----------------------------------------- |
-| `--template` | _(required)_ | `INITIUM_TEMPLATE`  | Path to template file                     |
-| `--output`   | _(required)_ | `INITIUM_OUTPUT`    | Output file path relative to workdir      |
-| `--workdir`  | `/work`      | `INITIUM_WORKDIR`   | Working directory for output files        |
-| `--mode`     | `envsubst`   | `INITIUM_MODE`      | Template mode: `envsubst` or `gotemplate` |
-| `--json`     | `false`      | `INITIUM_JSON`      | Enable JSON log output                    |
+| Flag         | Default      | Env Var            | Description                               |
+| ------------ | ------------ | ------------------ | ----------------------------------------- |
+| `--template` | _(required)_ | `INITIUM_TEMPLATE` | Path to template file                     |
+| `--output`   | _(required)_ | `INITIUM_OUTPUT`   | Output file path relative to workdir      |
+| `--workdir`  | `/work`      | `INITIUM_WORKDIR`  | Working directory for output files        |
+| `--mode`     | `envsubst`   | `INITIUM_MODE`     | Template mode: `envsubst` or `gotemplate` |
+| `--json`     | `false`      | `INITIUM_JSON`     | Enable JSON log output                    |
 
 **Exit codes:**
 
-| Code   | Meaning                                                                       |
-| ------ | ----------------------------------------------------------------------------- |
-| `0`    | Render succeeded                                                              |
-| `1`    | Invalid arguments, missing template, template syntax error, or path traversal |
+| Code | Meaning                                                                       |
+| ---- | ----------------------------------------------------------------------------- |
+| `0`  | Render succeeded                                                              |
+| `1`  | Invalid arguments, missing template, template syntax error, or path traversal |
 
 ### fetch
 
@@ -260,10 +260,10 @@ initium fetch --url http://cdn/config --output config.json \
 
 **Exit codes:**
 
-| Code   | Meaning                                                   |
-| ------ | --------------------------------------------------------- |
-| `0`    | Fetch succeeded                                           |
-| `1`    | Invalid arguments, HTTP error, timeout, or path traversal |
+| Code | Meaning                                                   |
+| ---- | --------------------------------------------------------- |
+| `0`  | Fetch succeeded                                           |
+| `1`  | Invalid arguments, HTTP error, timeout, or path traversal |
 
 ### exec
 
@@ -306,11 +306,11 @@ initium exec --workdir /certs -- openssl genrsa -out key.pem 4096
 
 **Exit codes:**
 
-| Code   | Meaning                              |
-| ------ | ------------------------------------ |
-| `0`    | Command succeeded                    |
-| `1`    | Command failed, or invalid arguments |
-| _N_    | Forwarded from the command           |
+| Code | Meaning                              |
+| ---- | ------------------------------------ |
+| `0`  | Command succeeded                    |
+| `1`  | Command failed, or invalid arguments |
+| _N_  | Forwarded from the command           |
 
 ## Building Custom Images with Initium
 
@@ -364,10 +364,10 @@ initContainers:
 
 ## Global Flags
 
-| Flag        | Default | Env Var            | Description                                                  |
-| ----------- | ------- | ------------------ | ------------------------------------------------------------ |
-| `--json`    | `false` | `INITIUM_JSON`     | Enable JSON-formatted log output                             |
-| `--sidecar` | `false` | `INITIUM_SIDECAR`  | Keep process alive after task completion (sidecar containers) |
+| Flag        | Default | Env Var           | Description                                                   |
+| ----------- | ------- | ----------------- | ------------------------------------------------------------- |
+| `--json`    | `false` | `INITIUM_JSON`    | Enable JSON-formatted log output                              |
+| `--sidecar` | `false` | `INITIUM_SIDECAR` | Keep process alive after task completion (sidecar containers) |
 
 All flags can be set via environment variables. Flag values take precedence over environment variables. Boolean env vars accept `true`/`false`, `1`/`0`, `yes`/`no`. The `INITIUM_TARGET` env var accepts comma-separated values for multiple targets.
 
@@ -401,10 +401,10 @@ containers:
 
 ## Exit Codes
 
-| Code   | Meaning                                                   |
-| ------ | --------------------------------------------------------- |
-| `0`    | Success                                                   |
-| `1`    | General error (invalid args, timeout, unreachable target) |
+| Code | Meaning                                                   |
+| ---- | --------------------------------------------------------- |
+| `0`  | Success                                                   |
+| `1`  | General error (invalid args, timeout, unreachable target) |
 
 ## Security Defaults
 

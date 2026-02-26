@@ -106,10 +106,10 @@ cargo build --release --no-default-features --features postgres,sqlite
 cargo build --release --no-default-features --features sqlite
 ```
 
-| Feature    | Default | Description        |
-| ---------- | ------- | ------------------ |
-| `sqlite`   | ✅       | SQLite driver      |
-| `postgres` | ✅       | PostgreSQL driver  |
+| Feature    | Default | Description          |
+| ---------- | ------- | -------------------- |
+| `sqlite`   | ✅       | SQLite driver        |
+| `postgres` | ✅       | PostgreSQL driver    |
 | `mysql`    | ✅       | MySQL/MariaDB driver |
 
 ## Helm Chart
@@ -330,13 +330,13 @@ helm install my-app charts/initium \
 
 Initium was built to address limitations in existing init container tools:
 
-| Tool                                                                        | Language | Image size  | Multi-tool | Database seeding | Security posture        |
-| --------------------------------------------------------------------------- | -------- | ----------- | ---------- | ---------------- | ----------------------- |
-| **Initium**                                                                 | Rust     | ~5 MB       | Yes        | Yes              | PSA `restricted`, no OS |
-| [wait-for-it](https://github.com/vishnubob/wait-for-it)                    | Bash     | Needs shell | No         | No               | Requires shell + netcat |
-| [dockerize](https://github.com/jwilder/dockerize)                          | Go       | ~17 MB      | Partial    | No               | Full OS image           |
-| [k8s-wait-for](https://github.com/groundnuty/k8s-wait-for)                | Bash     | Needs shell | No         | No               | Requires shell + kubectl|
-| [wait4x](https://github.com/atkrad/wait4x)                                | Go       | ~12 MB      | No         | No               | Minimal OS              |
+| Tool                                                       | Language | Image size  | Multi-tool | Database seeding | Security posture         |
+| ---------------------------------------------------------- | -------- | ----------- | ---------- | ---------------- | ------------------------ |
+| **Initium**                                                | Rust     | ~5 MB       | Yes        | Yes              | PSA `restricted`, no OS  |
+| [wait-for-it](https://github.com/vishnubob/wait-for-it)    | Bash     | Needs shell | No         | No               | Requires shell + netcat  |
+| [dockerize](https://github.com/jwilder/dockerize)          | Go       | ~17 MB      | Partial    | No               | Full OS image            |
+| [k8s-wait-for](https://github.com/groundnuty/k8s-wait-for) | Bash     | Needs shell | No         | No               | Requires shell + kubectl |
+| [wait4x](https://github.com/atkrad/wait4x)                 | Go       | ~12 MB      | No         | No               | Minimal OS               |
 
 If you only need TCP/HTTP readiness checks, any of these tools work. Initium is designed for teams that also need migrations, seeding, config rendering, and secret fetching in a single security-hardened binary.
 

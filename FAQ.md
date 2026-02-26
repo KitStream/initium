@@ -147,14 +147,14 @@ This is useful when you're shipping logs to a centralized system like Loki, Data
 
 All retry parameters are flags on the `wait-for` subcommand:
 
-| Flag               | Default   | What it does                                                             |
-| ------------------ | --------- | ------------------------------------------------------------------------ |
-| `--max-attempts`   | `60`      | Total number of attempts before giving up                                |
-| `--initial-delay`  | `1s`      | Delay after the first failure                                            |
-| `--max-delay`      | `30s`     | Upper bound on delay between retries                                     |
-| `--backoff-factor` | `2.0`     | Multiplier applied to the delay after each attempt                       |
-| `--jitter`         | `0.1`     | Random fraction (0.0–1.0) added to each delay to prevent thundering herd |
-| `--timeout`        | `5m`      | Hard deadline across all targets                                         |
+| Flag               | Default | What it does                                                             |
+| ------------------ | ------- | ------------------------------------------------------------------------ |
+| `--max-attempts`   | `60`    | Total number of attempts before giving up                                |
+| `--initial-delay`  | `1s`    | Delay after the first failure                                            |
+| `--max-delay`      | `30s`   | Upper bound on delay between retries                                     |
+| `--backoff-factor` | `2.0`   | Multiplier applied to the delay after each attempt                       |
+| `--jitter`         | `0.1`   | Random fraction (0.0–1.0) added to each delay to prevent thundering herd |
+| `--timeout`        | `5m`    | Hard deadline across all targets                                         |
 
 Example — fast retries with low jitter:
 

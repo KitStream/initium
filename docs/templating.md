@@ -15,8 +15,8 @@ Compute the SHA-256 hash of a string.
 
 **Parameters:**
 
-| Parameter | Type   | Default | Description                              |
-| --------- | ------ | ------- | ---------------------------------------- |
+| Parameter | Type   | Default | Description                         |
+| --------- | ------ | ------- | ----------------------------------- |
 | `mode`    | string | `"hex"` | Output format: `"hex"` or `"bytes"` |
 
 **Modes:**
@@ -94,8 +94,8 @@ decoded_cert: {{ env.B64_CERT | base64_decode }}
 
 ## Error Handling
 
-| Error                            | Cause                                                     |
-| -------------------------------- | --------------------------------------------------------- |
-| `sha256: unsupported mode '…'`   | Mode parameter is not `"hex"` or `"bytes"`                |
-| `base64_decode: invalid input`   | Input string is not valid Base64                          |
-| `base64_decode: not valid UTF-8` | Decoded bytes are not a valid UTF-8 string                |
+| Error                            | Cause                                      |
+| -------------------------------- | ------------------------------------------ |
+| `sha256: unsupported mode '…'`   | Mode parameter is not `"hex"` or `"bytes"` |
+| `base64_decode: invalid input`   | Input string is not valid Base64           |
+| `base64_decode: not valid UTF-8` | Decoded bytes are not a valid UTF-8 string |
