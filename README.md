@@ -10,7 +10,7 @@ Initium replaces fragile bash scripts in your initContainers with a single, secu
 ## Features
 
 - **Single static binary** — zero runtime dependencies, built `FROM scratch`
-- **Tiny image** — ~1.8 MB multi-arch container (amd64 + arm64)
+- **Tiny image** — ~5 MB multi-arch container (amd64 + arm64)
 - **Zero CVEs** — no OS packages, no shell, no attack surface
 - **PSA `restricted` compatible** — runs as non-root (UID 65534), read-only filesystem, all capabilities dropped
 - **Sidecar mode** — `--sidecar` flag keeps the process alive for use as a Kubernetes sidecar container
@@ -332,7 +332,7 @@ Initium was built to address limitations in existing init container tools:
 
 | Tool                                                                        | Language | Image size  | Multi-tool | Database seeding | Security posture        |
 | --------------------------------------------------------------------------- | -------- | ----------- | ---------- | ---------------- | ----------------------- |
-| **Initium**                                                                 | Rust     | ~1.8 MB     | Yes        | Yes              | PSA `restricted`, no OS |
+| **Initium**                                                                 | Rust     | ~5 MB       | Yes        | Yes              | PSA `restricted`, no OS |
 | [wait-for-it](https://github.com/vishnubob/wait-for-it)                    | Bash     | Needs shell | No         | No               | Requires shell + netcat |
 | [dockerize](https://github.com/jwilder/dockerize)                          | Go       | ~17 MB      | Partial    | No               | Full OS image           |
 | [k8s-wait-for](https://github.com/groundnuty/k8s-wait-for)                | Bash     | Needs shell | No         | No               | Requires shell + kubectl|

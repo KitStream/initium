@@ -88,7 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests for seed schema parsing, database operations, executor logic, references, idempotency, reset, and edge cases
 
 ### Changed
-- Complete rewrite from Go to Rust for ~76% smaller Docker images (7.4MB → 1.8MB)
+- Complete rewrite from Go to Rust for smaller Docker images (7.4MB → ~5MB)
 - CLI framework changed from cobra to clap
 - Template engine changed from Go text/template to minijinja (Jinja2-style); access env vars via `{{ env.VAR }}`
 - CI/CD workflows updated for Rust toolchain (cargo test, clippy, rustfmt)
