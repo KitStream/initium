@@ -2,14 +2,17 @@
 name = "initium"
 version = "1.0.4"
 edition = "2021"
-description = "Swiss-army toolbox for Kubernetes initContainers"
+rust-version = "1.88"
+authors = ["Kitstream <opensource@kitstream.io>"]
+description = "Swiss-army toolbox for Kubernetes initContainers — wait-for, migrate, seed, render, fetch in a single static Rust binary"
 license = "Apache-2.0"
 repository = "https://github.com/KitStream/initium"
 homepage = "https://github.com/KitStream/initium"
-documentation = "https://github.com/KitStream/initium/blob/main/docs/usage.md"
+documentation = "https://docs.rs/initium"
 keywords = ["kubernetes", "initcontainer", "sidecar", "container", "devops"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
+exclude = ["tests/", "examples/", ".github/", "charts/", "docs/", ".claude/"]
 
 [[bin]]
 name = "initium"

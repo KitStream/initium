@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Improved crates.io metadata: keyword-rich description, `rust-version = "1.88"` MSRV, authors, `documentation` pointing to docs.rs, and `exclude` to reduce published crate size
+- Added `#![doc = include_str!("../README.md")]` to `src/main.rs` so docs.rs renders the README as the crate landing page
+- Release workflow now publishes to crates.io automatically on tag push (requires `CARGO_REGISTRY_TOKEN` secret)
+
 ### Added
 - Custom MiniJinja template filters: `sha256`, `base64_encode`, `base64_decode` available in all templates (render and seed spec files)
 - `sha256` filter with optional `mode` parameter (`"hex"` default, `"bytes"` for byte array output)
