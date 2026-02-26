@@ -1,6 +1,4 @@
 .idea/
 target/
 bin/
-CLAUDE.md
 .output.txt
-/.claude/settings.json
