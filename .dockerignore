@@ -2,6 +2,7 @@ target/
 .git/
 bin/
 *.md
+!README.md
 docs/
 examples/
 charts/
