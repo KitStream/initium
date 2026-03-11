@@ -3,13 +3,13 @@ ARG VERSION=dev
 RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static perl
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
-COPY . .
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/src/target \
+RUN mkdir src && echo 'fn main() {}' > src/main.rs && \
     cargo build --release && \
-    cp target/release/initium /initium
+    rm -rf src target/release/deps/initium* target/release/initium*
+COPY . .
+RUN cargo build --release
 FROM scratch
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=builder /initium /initium
+COPY --from=builder /src/target/release/initium /initium
 USER 65534:65534
 ENTRYPOINT ["/initium"]

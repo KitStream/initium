@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auto-tag workflow: CI automatically creates a git tag when `Cargo.toml` version changes on main, triggering the release workflow.
 - `/release` skill for Claude Code: guided release preparation with version determination, confirmation, and PR creation.
 
+### Fixed
+- Replaced Dockerfile `--mount=type=cache` with dependency layer caching ("empty main" trick) for reliable Docker build caching in GitHub Actions, where `--mount=type=cache` does not persist across runners.
+
 ## [1.2.0] - 2026-03-11
 
 ### Added
