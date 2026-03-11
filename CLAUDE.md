@@ -81,19 +81,19 @@ Agent execution constraints (for local runners / GH actions)
 - Avoid making assumptions without asking for confirmation.
 
 19) When running locally, prefer the mcp edit tool to direct file edits.
-- If issues arise where files seems unedited, alert the user before continuing
+- If issues arise where files seem unedited, alert the user before continuing.
 
-20) Prefer bash commands/scripts to python3 when investigating
+20) Prefer bash commands/scripts to python3 when investigating.
 
 Definition of implement issue
 - Find the issue in github issues.
 - If not found, inform the user.
 - If found:
-    - Fetch the git origin
+    - Fetch from origin
     - Create a branch with the issue number in the name from origin/main.
     - Implement the issue.
     - Run all e2e tests.
-    - If during implementation, obvious errors was found in the ooriginating issue, also add a comment to the issue about the fix.
+    - If during implementation, obvious errors were found in the originating issue, also add a comment to the issue about the fix.
     - If running from Claude Code or Claude Desktop:
       - Do NOT create a PR automatically.
       - Instead, present a summary of changes and let the user decide when to create the PR.
