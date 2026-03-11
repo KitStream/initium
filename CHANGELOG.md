@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Reconcile mode for seed sets (`mode: reconcile`): declarative seeding where the spec is the source of truth. Changed rows are updated, new rows are inserted, and removed rows are deleted automatically.
+- `--reconcile-all` CLI flag to override all seed sets to reconcile mode for a single run.
+- `--dry-run` CLI flag to preview what changes reconciliation would make without modifying the database.
+- Per-row tracking table (`initium_seed_rows`) for change detection and orphan deletion in reconcile mode.
+- Content hash (`content_hash` column) on the seed tracking table for fast "anything changed?" checks before row-by-row comparison.
+- Automatic migration of existing tracking tables: the `content_hash` column is added transparently on first run. Existing seed sets remain in `once` mode with no behavior change.
+
+### Changed
+- Reconcile hash-skip now only applies to seed sets without `@ref:` expressions. Seed sets containing `@ref:` references always run row-level reconciliation to prevent stale foreign keys when upstream auto-generated IDs shift.
+- Hash computation sorts tables by `(order, table_name)` instead of just `order` for deterministic hashing when multiple tables share the same order value.
+- Dry-run mode treats `@ref:` expressions as literals to avoid failures when references haven't been populated yet (e.g., auto_id + refs within the same seed set).
+
+### Fixed
+- `--reconcile-all` now rejects seed sets where any table is missing `unique_key`, preventing reconciliation from generating identical row keys and updating/deleting wrong rows.
+- Reconcile mode validation now rejects empty/whitespace-only `unique_key` entries and reserved column names like `_ref`.
+- Reconcile mode validation now checks that every row contains all `unique_key` columns, preventing incomplete row keys during reconciliation.
+- MySQL row tracking table now uses SHA-256 generated column (`row_key_hash`) for the primary key instead of `row_key(255)` prefix, preventing key collisions for JSON keys exceeding 255 bytes.
+
 ## [1.1.0] - 2026-02-26
 
 ### Added

@@ -145,6 +145,18 @@ enum Commands {
             help = "Reset mode: delete existing data before re-seeding"
         )]
         reset: bool,
+        #[arg(
+            long,
+            env = "INITIUM_DRY_RUN",
+            help = "Dry-run: show what would change without modifying the database"
+        )]
+        dry_run: bool,
+        #[arg(
+            long,
+            env = "INITIUM_RECONCILE_ALL",
+            help = "Override all seed sets to reconcile mode for this run"
+        )]
+        reconcile_all: bool,
     },
 
     /// Render templates into config files
@@ -313,7 +325,12 @@ fn main() {
             lock_file,
             args,
         } => cmd::migrate::run(&log, &args, &workdir, &lock_file),
-        Commands::Seed { spec, reset } => seed::run(&log, &spec, reset),
+        Commands::Seed {
+            spec,
+            reset,
+            dry_run,
+            reconcile_all,
+        } => seed::run(&log, &spec, reset, dry_run, reconcile_all),
         Commands::Render {
             template,
             output,

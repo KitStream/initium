@@ -50,6 +50,7 @@ phases:
     seed_sets:                     # Optional. Seed sets to apply in this phase.
       - name: initial_data
         order: 1                   # Optional. Controls execution order across seed sets.
+        mode: once                 # Optional. "once" (default) or "reconcile".
         tables:
           - table: config
             order: 1               # Optional. Controls execution order within a seed set.
@@ -82,6 +83,7 @@ phases:
 | `phases[].wait_for[].timeout`                   | string   | No       | Per-object timeout override (e.g. `60s`, `2m`, `1m30s`)          |
 | `phases[].seed_sets[].name`                     | string   | Yes      | Unique name for the seed set (used in tracking)                  |
 | `phases[].seed_sets[].order`                    | integer  | No       | Execution order (lower values first, default: 0)                 |
+| `phases[].seed_sets[].mode`                     | string   | No       | Seed mode: `once` (default) or `reconcile`                       |
 | `phases[].seed_sets[].tables[].table`           | string   | Yes      | Target database table name                                       |
 | `phases[].seed_sets[].tables[].order`           | integer  | No       | Execution order within the seed set (default: 0)                 |
 | `phases[].seed_sets[].tables[].unique_key`      | string[] | No       | Columns for duplicate detection                                  |
@@ -213,6 +215,55 @@ rows:
     password_hash: "{{ env.ADMIN_PASSWORD_HASH }}"
 ```
 
+### Reconcile Mode
+
+By default, seed sets are applied once and never modified (`mode: once`). Reconcile mode makes seeding declarative: the rendered spec becomes the source of truth, and initium reconciles the database to match it whenever the rendered spec changes.
+
+If the rendered spec has not changed since the last run (content hash match), initium treats the seed set as already reconciled and skips it. Out-of-band database changes are not corrected until a spec change triggers reconciliation again.
+
+Enable reconcile mode per seed set:
+
+```yaml
+seed_sets:
+  - name: departments
+    mode: reconcile        # "once" (default) or "reconcile"
+    tables:
+      - table: departments
+        unique_key: [name]  # Required for reconcile mode
+        rows:
+          - name: Engineering
+          - name: Sales
+```
+
+Or override all seed sets for a single run:
+
+```bash
+initium seed --spec /seeds/seed.yaml --reconcile-all
+```
+
+**How it works:**
+
+1. On each run, initium computes a content hash of the rendered seed set (after template/env expansion).
+2. If the hash matches the stored hash, the seed set is skipped (no-op).
+3. If the hash differs, initium reconciles row by row:
+   - **New rows** (in spec but not in DB) are inserted.
+   - **Changed rows** (different values for same unique key) are updated.
+   - **Removed rows** (in DB but not in spec) are deleted.
+
+**Requirements:**
+- Every table in a reconciled seed set must have a `unique_key`. Without it, there is no way to identify which rows correspond to which spec entries.
+- Environment variable changes trigger reconciliation (resolved values are compared, not raw templates).
+
+**Row tracking:** Initium creates a companion table (`{tracking_table}_rows`, e.g., `initium_seed_rows`) that stores the resolved values of each seeded row. This enables change detection and orphan deletion.
+
+**Dry-run mode:** Preview what reconciliation would do without modifying the database:
+
+```bash
+initium seed --spec /seeds/seed.yaml --dry-run
+```
+
+This logs insert/update/delete counts per table without executing any changes.
+
 ### Reset Mode
 
 Use `--reset` to delete all data from seeded tables and remove tracking entries before re-applying. Tables are deleted in reverse order to respect foreign key constraints:
@@ -276,11 +327,13 @@ spec:
 
 ## CLI Reference
 
-| Flag      | Default    | Description                             |
-| --------- | ---------- | --------------------------------------- |
-| `--spec`  | (required) | Path to seed spec file (YAML or JSON)   |
-| `--reset` | `false`    | Delete existing data and re-apply seeds |
-| `--json`  | `false`    | Enable JSON log output                  |
+| Flag               | Default    | Description                                               |
+| ------------------ | ---------- | --------------------------------------------------------- |
+| `--spec`           | (required) | Path to seed spec file (YAML or JSON)                     |
+| `--reset`          | `false`    | Delete existing data and re-apply seeds                   |
+| `--dry-run`        | `false`    | Preview changes without modifying the database            |
+| `--reconcile-all`  | `false`    | Override all seed sets to reconcile mode for this run      |
+| `--json`           | `false`    | Enable JSON log output                                    |
 
 ## Failure Modes
 

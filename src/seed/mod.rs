@@ -1,5 +1,6 @@
 pub mod db;
 pub mod executor;
+pub mod hash;
 pub mod schema;
 
 use crate::logging::Logger;
@@ -19,7 +20,13 @@ fn render_template(content: &str) -> Result<String, String> {
         .map_err(|e| format!("rendering seed template: {}", e))
 }
 
-pub fn run(log: &Logger, spec_file: &str, reset: bool) -> Result<(), String> {
+pub fn run(
+    log: &Logger,
+    spec_file: &str,
+    reset: bool,
+    dry_run: bool,
+    reconcile_all: bool,
+) -> Result<(), String> {
     let content = std::fs::read_to_string(spec_file)
         .map_err(|e| format!("reading seed spec '{}': {}", spec_file, e))?;
 
@@ -38,7 +45,9 @@ pub fn run(log: &Logger, spec_file: &str, reset: bool) -> Result<(), String> {
     log.info("connecting to database", &[("driver", driver.as_str())]);
 
     let db = db::connect(&driver, &db_url)?;
-    let mut exec = executor::SeedExecutor::new(log, db, tracking_table, reset);
+    let mut exec = executor::SeedExecutor::new(log, db, tracking_table, reset)
+        .with_dry_run(dry_run)
+        .with_reconcile_all(reconcile_all);
     exec.execute(&plan)
 }
 

@@ -98,7 +98,19 @@ pub struct SeedSet {
     pub name: String,
     #[serde(default)]
     pub order: i32,
+    #[serde(default = "default_seed_mode")]
+    pub mode: String,
     pub tables: Vec<TableSeed>,
+}
+
+fn default_seed_mode() -> String {
+    "once".into()
+}
+
+impl SeedSet {
+    pub fn is_reconcile(&self) -> bool {
+        self.mode == "reconcile"
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -198,6 +210,15 @@ impl SeedPlan {
         if ss.name.is_empty() {
             return Err("seed_set name must not be empty".into());
         }
+        let valid_modes = ["once", "reconcile"];
+        if !valid_modes.contains(&ss.mode.as_str()) {
+            return Err(format!(
+                "seed_set '{}' has invalid mode '{}' (supported: {})",
+                ss.name,
+                ss.mode,
+                valid_modes.join(", ")
+            ));
+        }
         if ss.tables.is_empty() {
             return Err(format!(
                 "seed_set '{}' must contain at least one table",
@@ -210,6 +231,41 @@ impl SeedPlan {
                     "table name must not be empty in seed_set '{}'",
                     ss.name
                 ));
+            }
+            if ss.is_reconcile() && ts.unique_key.is_empty() {
+                return Err(format!(
+                    "table '{}' in seed_set '{}' must have unique_key when mode is 'reconcile'",
+                    ts.table, ss.name
+                ));
+            }
+            if ss.is_reconcile() {
+                if ts.unique_key.iter().any(|k| k.trim().is_empty()) {
+                    return Err(format!(
+                        "table '{}' in seed_set '{}' has empty or whitespace-only entries in unique_key when mode is 'reconcile'",
+                        ts.table, ss.name
+                    ));
+                }
+                let reserved_keys = ["_ref"];
+                if let Some(reserved) = ts
+                    .unique_key
+                    .iter()
+                    .find(|k| reserved_keys.contains(&k.as_str()))
+                {
+                    return Err(format!(
+                        "table '{}' in seed_set '{}' uses reserved column '{}' in unique_key when mode is 'reconcile'",
+                        ts.table, ss.name, reserved
+                    ));
+                }
+                for (row_idx, row) in ts.rows.iter().enumerate() {
+                    for uk in &ts.unique_key {
+                        if !row.contains_key(uk) {
+                            return Err(format!(
+                                "table '{}' in seed_set '{}': row {} is missing unique_key column '{}'",
+                                ts.table, ss.name, row_idx + 1, uk
+                            ));
+                        }
+                    }
+                }
             }
         }
         Ok(())
@@ -618,5 +674,68 @@ phases:
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         assert!(plan.phases[0].seed_sets.is_empty());
+    }
+
+    #[test]
+    fn test_reconcile_rejects_empty_unique_key_entry() {
+        let yaml = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: p
+    seed_sets:
+      - name: s
+        mode: reconcile
+        tables:
+          - table: t
+            unique_key: ["", "k"]
+            rows:
+              - k: a
+"#;
+        let err = SeedPlan::from_yaml(yaml).unwrap_err();
+        assert!(err.contains("empty or whitespace-only"));
+    }
+
+    #[test]
+    fn test_reconcile_rejects_reserved_unique_key() {
+        let yaml = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: p
+    seed_sets:
+      - name: s
+        mode: reconcile
+        tables:
+          - table: t
+            unique_key: [_ref]
+            rows:
+              - _ref: r1
+"#;
+        let err = SeedPlan::from_yaml(yaml).unwrap_err();
+        assert!(err.contains("reserved column '_ref'"));
+    }
+
+    #[test]
+    fn test_reconcile_rejects_row_missing_unique_key_column() {
+        let yaml = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: p
+    seed_sets:
+      - name: s
+        mode: reconcile
+        tables:
+          - table: t
+            unique_key: [email]
+            rows:
+              - name: Alice
+"#;
+        let err = SeedPlan::from_yaml(yaml).unwrap_err();
+        assert!(err.contains("missing unique_key column 'email'"));
     }
 }
