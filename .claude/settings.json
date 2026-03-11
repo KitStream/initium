@@ -13,7 +13,10 @@
       "Bash(git push * master)",
       "Bash(git push * master *)",
       "Bash(git push --force *)",
+      "Bash(git push * --force *)",
       "Bash(git push -f *)",
+      "Bash(git push * -f *)",
+      "Bash(git push * +*)",
       "Bash(git reset --hard*)",
       "Bash(git clean -f*)",
       "Bash(git branch -D *)",
@@ -46,8 +49,8 @@
       "WebSearch",
       "Task",
 
-      "Edit(/**)",
-      "Write(/**)",
+      "Edit",
+      "Write",
 
       "Bash(git status*)",
       "Bash(git log*)",
