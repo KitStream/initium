@@ -12,12 +12,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Check for version bump
         id: version
         run: |
           CURRENT=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
-          PREVIOUS=$(git show HEAD~1:Cargo.toml | grep '^version' | head -1 | sed 's/.*"\(.*\)"/\1/')
+          if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            PREVIOUS="$CURRENT"
+          else
+            PREVIOUS=$(git show ${{ github.event.before }}:Cargo.toml | grep '^version' | head -1 | sed 's/.*"\(.*\)"/\1/')
+          fi
           echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
           echo "previous=$PREVIOUS" >> "$GITHUB_OUTPUT"
           if [ "$CURRENT" != "$PREVIOUS" ]; then
@@ -30,11 +34,22 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.current }}"
           TAG="v${VERSION}"
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q .; then
+            echo "Tag $TAG already exists on origin, skipping"
+            exit 0
+          fi
           if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists, skipping"
+            echo "Tag $TAG already exists locally, skipping"
             exit 0
           fi
           git tag "$TAG"
-          git push origin "$TAG"
+          if ! git push origin "$TAG"; then
+            if git ls-remote --tags origin "refs/tags/$TAG" | grep -q .; then
+              echo "Tag $TAG was created concurrently on origin, skipping"
+              exit 0
+            fi
+            echo "Failed to push tag $TAG"
+            exit 1
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

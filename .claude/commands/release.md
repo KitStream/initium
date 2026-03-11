@@ -28,7 +28,7 @@ Once confirmed:
 
 1. Fetch origin and create a branch: `release/vX.Y.Z` from `origin/main`.
 2. Bump version in `Cargo.toml` (the `version = "..."` field under `[package]`).
-3. Run `cargo check` to update `Cargo.lock`.
+3. Run `cargo check` to ensure the project builds successfully after the version bump.
 4. Update `CHANGELOG.md`:
    - Move everything under `## [Unreleased]` into a new `## [X.Y.Z] - YYYY-MM-DD` section (use today's date).
    - Leave `## [Unreleased]` empty (with just the heading).
