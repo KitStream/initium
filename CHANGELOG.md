@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-03-11
+
 ### Added
 - Reconcile mode for seed sets (`mode: reconcile`): declarative seeding where the spec is the source of truth. Changed rows are updated, new rows are inserted, and removed rows are deleted automatically.
 - `--reconcile-all` CLI flag to override all seed sets to reconcile mode for a single run.
@@ -14,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-row tracking table (`initium_seed_rows`) for change detection and orphan deletion in reconcile mode.
 - Content hash (`content_hash` column) on the seed tracking table for fast "anything changed?" checks before row-by-row comparison.
 - Automatic migration of existing tracking tables: the `content_hash` column is added transparently on first run. Existing seed sets remain in `once` mode with no behavior change.
+- CI summary job (`ci`) for branch ruleset status check compatibility.
 
 ### Changed
 - Reconcile hash-skip now only applies to seed sets without `@ref:` expressions. Seed sets containing `@ref:` references always run row-level reconciliation to prevent stale foreign keys when upstream auto-generated IDs shift.
