@@ -45,3 +45,13 @@ jobs:
       - run: helm lint charts/initium
       - run: helm template test-release charts/initium --set sampleDeployment.enabled=true --set 'initContainers[0].name=wait' --set 'initContainers[0].command[0]=wait-for' --set 'initContainers[0].args[0]=--target' --set 'initContainers[0].args[1]=tcp://localhost:5432'
       - run: helm unittest charts/initium
+  ci:
+    if: always()
+    needs: [lint, test, build, helm-lint]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more jobs failed or were cancelled"
+            exit 1
+          fi

@@ -24,6 +24,87 @@ pub trait Database: Send {
     fn create_schema(&mut self, name: &str) -> Result<(), String>;
     fn object_exists(&mut self, obj_type: &str, name: &str) -> Result<bool, String>;
     fn driver_name(&self) -> &str;
+
+    // --- Reconciliation support ---
+
+    /// Add content_hash column to existing tracking table if missing.
+    fn migrate_tracking_table(&mut self, table_name: &str) -> Result<(), String>;
+
+    /// Create the per-row tracking table ({tracking_table}_rows).
+    fn ensure_row_tracking_table(&mut self, table_name: &str) -> Result<(), String>;
+
+    /// Get the stored content hash for a seed set.
+    fn get_seed_hash(&mut self, table_name: &str, seed_set: &str)
+        -> Result<Option<String>, String>;
+
+    /// Update the tracking entry with a new hash (upsert).
+    fn update_seed_entry(
+        &mut self,
+        table_name: &str,
+        seed_set: &str,
+        hash: &str,
+    ) -> Result<(), String>;
+
+    /// Store or update a tracked row in the row tracking table.
+    fn store_tracked_row(
+        &mut self,
+        tracking_table: &str,
+        seed_set: &str,
+        table_name: &str,
+        row_key: &str,
+        row_values: &str,
+    ) -> Result<(), String>;
+
+    /// Get all tracked rows for a seed set + table.
+    fn get_tracked_rows(
+        &mut self,
+        tracking_table: &str,
+        seed_set: &str,
+        table_name: &str,
+    ) -> Result<Vec<(String, String)>, String>;
+
+    /// Delete a specific tracked row.
+    fn delete_tracked_row(
+        &mut self,
+        tracking_table: &str,
+        seed_set: &str,
+        table_name: &str,
+        row_key: &str,
+    ) -> Result<(), String>;
+
+    /// Delete all tracked rows for a seed set.
+    fn delete_all_tracked_rows(
+        &mut self,
+        tracking_table: &str,
+        seed_set: &str,
+    ) -> Result<(), String>;
+
+    /// Update specific columns of a row identified by key columns.
+    fn update_row(
+        &mut self,
+        table: &str,
+        set_columns: &[String],
+        set_values: &[String],
+        where_columns: &[String],
+        where_values: &[String],
+    ) -> Result<u64, String>;
+
+    /// Fetch specific column values from a row identified by key columns.
+    fn get_row_columns(
+        &mut self,
+        table: &str,
+        key_columns: &[String],
+        key_values: &[String],
+        fetch_columns: &[String],
+    ) -> Result<Option<Vec<String>>, String>;
+
+    /// Delete a single row identified by key columns.
+    fn delete_row_by_key(
+        &mut self,
+        table: &str,
+        key_columns: &[String],
+        key_values: &[String],
+    ) -> Result<u64, String>;
 }
 
 #[cfg(feature = "sqlite")]
@@ -235,6 +316,274 @@ impl Database for SqliteDb {
 
     fn driver_name(&self) -> &str {
         "sqlite"
+    }
+
+    fn migrate_tracking_table(&mut self, table_name: &str) -> Result<(), String> {
+        let safe = sanitize_identifier(table_name);
+        // Check if content_hash column exists
+        let sql = format!("PRAGMA table_info(\"{}\")", safe);
+        let has_hash = self
+            .conn
+            .prepare(&sql)
+            .map_err(|e| format!("checking tracking table schema: {}", e))?
+            .query_map([], |row| {
+                let name: String = row.get(1)?;
+                Ok(name)
+            })
+            .map_err(|e| format!("reading tracking table schema: {}", e))?
+            .any(|r| r.map(|n| n == "content_hash").unwrap_or(false));
+
+        if !has_hash {
+            let alter = format!("ALTER TABLE \"{}\" ADD COLUMN content_hash TEXT", safe);
+            self.conn
+                .execute(&alter, [])
+                .map_err(|e| format!("migrating tracking table: {}", e))?;
+        }
+        Ok(())
+    }
+
+    fn ensure_row_tracking_table(&mut self, table_name: &str) -> Result<(), String> {
+        let safe = sanitize_identifier(table_name);
+        let sql = format!(
+            "CREATE TABLE IF NOT EXISTS \"{}_rows\" (
+                seed_set TEXT NOT NULL,
+                table_name TEXT NOT NULL,
+                row_key TEXT NOT NULL,
+                row_values TEXT NOT NULL,
+                applied_at TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (seed_set, table_name, row_key)
+            )",
+            safe
+        );
+        self.conn
+            .execute(&sql, [])
+            .map_err(|e| format!("creating row tracking table: {}", e))?;
+        Ok(())
+    }
+
+    fn get_seed_hash(
+        &mut self,
+        table_name: &str,
+        seed_set: &str,
+    ) -> Result<Option<String>, String> {
+        let sql = format!(
+            "SELECT content_hash FROM \"{}\" WHERE seed_set = ?1",
+            sanitize_identifier(table_name)
+        );
+        match self
+            .conn
+            .query_row(&sql, [seed_set], |row| row.get::<_, Option<String>>(0))
+        {
+            Ok(hash) => Ok(hash),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(format!("getting seed hash: {}", e)),
+        }
+    }
+
+    fn update_seed_entry(
+        &mut self,
+        table_name: &str,
+        seed_set: &str,
+        hash: &str,
+    ) -> Result<(), String> {
+        let safe = sanitize_identifier(table_name);
+        // Upsert: update hash if exists, insert if not
+        let sql = format!(
+            "INSERT INTO \"{}\" (seed_set, content_hash) VALUES (?1, ?2) \
+             ON CONFLICT(seed_set) DO UPDATE SET content_hash = ?2, applied_at = datetime('now')",
+            safe
+        );
+        self.conn
+            .execute(&sql, [seed_set, hash])
+            .map_err(|e| format!("updating seed entry: {}", e))?;
+        Ok(())
+    }
+
+    fn store_tracked_row(
+        &mut self,
+        tracking_table: &str,
+        seed_set: &str,
+        table_name: &str,
+        row_key: &str,
+        row_values: &str,
+    ) -> Result<(), String> {
+        let safe = sanitize_identifier(tracking_table);
+        let sql = format!(
+            "INSERT INTO \"{}_rows\" (seed_set, table_name, row_key, row_values) VALUES (?1, ?2, ?3, ?4) \
+             ON CONFLICT(seed_set, table_name, row_key) DO UPDATE SET row_values = ?4, applied_at = datetime('now')",
+            safe
+        );
+        self.conn
+            .execute(&sql, [seed_set, table_name, row_key, row_values])
+            .map_err(|e| format!("storing tracked row: {}", e))?;
+        Ok(())
+    }
+
+    fn get_tracked_rows(
+        &mut self,
+        tracking_table: &str,
+        seed_set: &str,
+        table_name: &str,
+    ) -> Result<Vec<(String, String)>, String> {
+        let safe = sanitize_identifier(tracking_table);
+        let sql = format!(
+            "SELECT row_key, row_values FROM \"{}_rows\" WHERE seed_set = ?1 AND table_name = ?2",
+            safe
+        );
+        let mut stmt = self
+            .conn
+            .prepare(&sql)
+            .map_err(|e| format!("preparing tracked rows query: {}", e))?;
+        let rows = stmt
+            .query_map([seed_set, table_name], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(|e| format!("querying tracked rows: {}", e))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("reading tracked rows: {}", e))?;
+        Ok(rows)
+    }
+
+    fn delete_tracked_row(
+        &mut self,
+        tracking_table: &str,
+        seed_set: &str,
+        table_name: &str,
+        row_key: &str,
+    ) -> Result<(), String> {
+        let safe = sanitize_identifier(tracking_table);
+        let sql = format!(
+            "DELETE FROM \"{}_rows\" WHERE seed_set = ?1 AND table_name = ?2 AND row_key = ?3",
+            safe
+        );
+        self.conn
+            .execute(&sql, [seed_set, table_name, row_key])
+            .map_err(|e| format!("deleting tracked row: {}", e))?;
+        Ok(())
+    }
+
+    fn delete_all_tracked_rows(
+        &mut self,
+        tracking_table: &str,
+        seed_set: &str,
+    ) -> Result<(), String> {
+        let safe = sanitize_identifier(tracking_table);
+        let sql = format!("DELETE FROM \"{}_rows\" WHERE seed_set = ?1", safe);
+        self.conn
+            .execute(&sql, [seed_set])
+            .map_err(|e| format!("deleting all tracked rows: {}", e))?;
+        Ok(())
+    }
+
+    fn update_row(
+        &mut self,
+        table: &str,
+        set_columns: &[String],
+        set_values: &[String],
+        where_columns: &[String],
+        where_values: &[String],
+    ) -> Result<u64, String> {
+        let set_clause: Vec<String> = set_columns
+            .iter()
+            .enumerate()
+            .map(|(i, c)| format!("\"{}\" = ?{}", sanitize_identifier(c), i + 1))
+            .collect();
+        let where_clause: Vec<String> = where_columns
+            .iter()
+            .enumerate()
+            .map(|(i, c)| {
+                format!(
+                    "\"{}\" = ?{}",
+                    sanitize_identifier(c),
+                    set_values.len() + i + 1
+                )
+            })
+            .collect();
+        let sql = format!(
+            "UPDATE \"{}\" SET {} WHERE {}",
+            sanitize_identifier(table),
+            set_clause.join(", "),
+            where_clause.join(" AND ")
+        );
+        let mut all_values: Vec<&dyn rusqlite::types::ToSql> = Vec::new();
+        for v in set_values.iter().chain(where_values.iter()) {
+            all_values.push(v as &dyn rusqlite::types::ToSql);
+        }
+        let count = self
+            .conn
+            .execute(&sql, all_values.as_slice())
+            .map_err(|e| format!("updating row in '{}': {}", table, e))?;
+        Ok(count as u64)
+    }
+
+    fn get_row_columns(
+        &mut self,
+        table: &str,
+        key_columns: &[String],
+        key_values: &[String],
+        fetch_columns: &[String],
+    ) -> Result<Option<Vec<String>>, String> {
+        if fetch_columns.is_empty() {
+            return Ok(None);
+        }
+        let select_cols: Vec<String> = fetch_columns
+            .iter()
+            .map(|c| format!("CAST(\"{}\" AS TEXT)", sanitize_identifier(c)))
+            .collect();
+        let where_clause: Vec<String> = key_columns
+            .iter()
+            .enumerate()
+            .map(|(i, c)| format!("\"{}\" = ?{}", sanitize_identifier(c), i + 1))
+            .collect();
+        let sql = format!(
+            "SELECT {} FROM \"{}\" WHERE {}",
+            select_cols.join(", "),
+            sanitize_identifier(table),
+            where_clause.join(" AND ")
+        );
+        let params: Vec<&dyn rusqlite::types::ToSql> = key_values
+            .iter()
+            .map(|v| v as &dyn rusqlite::types::ToSql)
+            .collect();
+        match self.conn.query_row(&sql, params.as_slice(), |row| {
+            let mut vals = Vec::new();
+            for i in 0..fetch_columns.len() {
+                let v: Option<String> = row.get(i)?;
+                vals.push(v.unwrap_or_default());
+            }
+            Ok(vals)
+        }) {
+            Ok(vals) => Ok(Some(vals)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(format!("getting row from '{}': {}", table, e)),
+        }
+    }
+
+    fn delete_row_by_key(
+        &mut self,
+        table: &str,
+        key_columns: &[String],
+        key_values: &[String],
+    ) -> Result<u64, String> {
+        let where_clause: Vec<String> = key_columns
+            .iter()
+            .enumerate()
+            .map(|(i, c)| format!("\"{}\" = ?{}", sanitize_identifier(c), i + 1))
+            .collect();
+        let sql = format!(
+            "DELETE FROM \"{}\" WHERE {}",
+            sanitize_identifier(table),
+            where_clause.join(" AND ")
+        );
+        let params: Vec<&dyn rusqlite::types::ToSql> = key_values
+            .iter()
+            .map(|v| v as &dyn rusqlite::types::ToSql)
+            .collect();
+        let count = self
+            .conn
+            .execute(&sql, params.as_slice())
+            .map_err(|e| format!("deleting row from '{}': {}", table, e))?;
+        Ok(count as u64)
     }
 }
 
@@ -477,6 +826,247 @@ impl Database for PostgresDb {
     fn driver_name(&self) -> &str {
         "postgres"
     }
+
+    fn migrate_tracking_table(&mut self, table_name: &str) -> Result<(), String> {
+        let safe = sanitize_identifier(table_name);
+        let sql = format!(
+            "DO $$ BEGIN \
+               IF NOT EXISTS (SELECT 1 FROM information_schema.columns \
+                 WHERE table_name='{}' AND column_name='content_hash') THEN \
+                 ALTER TABLE \"{}\" ADD COLUMN content_hash TEXT; \
+               END IF; \
+             END $$",
+            safe, safe
+        );
+        self.client
+            .execute(&sql, &[])
+            .map_err(|e| format!("migrating tracking table: {}", e))?;
+        Ok(())
+    }
+
+    fn ensure_row_tracking_table(&mut self, table_name: &str) -> Result<(), String> {
+        let safe = sanitize_identifier(table_name);
+        let sql = format!(
+            "CREATE TABLE IF NOT EXISTS \"{}_rows\" (
+                seed_set TEXT NOT NULL,
+                table_name TEXT NOT NULL,
+                row_key TEXT NOT NULL,
+                row_values TEXT NOT NULL,
+                applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (seed_set, table_name, row_key)
+            )",
+            safe
+        );
+        self.client
+            .execute(&sql, &[])
+            .map_err(|e| format!("creating row tracking table: {}", e))?;
+        Ok(())
+    }
+
+    fn get_seed_hash(
+        &mut self,
+        table_name: &str,
+        seed_set: &str,
+    ) -> Result<Option<String>, String> {
+        let sql = format!(
+            "SELECT content_hash FROM \"{}\" WHERE seed_set = $1",
+            sanitize_identifier(table_name)
+        );
+        let rows = self
+            .client
+            .query(&sql, &[&seed_set])
+            .map_err(|e| format!("getting seed hash: {}", e))?;
+        if rows.is_empty() {
+            Ok(None)
+        } else {
+            Ok(rows[0].get(0))
+        }
+    }
+
+    fn update_seed_entry(
+        &mut self,
+        table_name: &str,
+        seed_set: &str,
+        hash: &str,
+    ) -> Result<(), String> {
+        let safe = sanitize_identifier(table_name);
+        let sql = format!(
+            "INSERT INTO \"{}\" (seed_set, content_hash) VALUES ($1, $2) \
+             ON CONFLICT(seed_set) DO UPDATE SET content_hash = $2, applied_at = NOW()",
+            safe
+        );
+        self.client
+            .execute(&sql, &[&seed_set, &hash])
+            .map_err(|e| format!("updating seed entry: {}", e))?;
+        Ok(())
+    }
+
+    fn store_tracked_row(
+        &mut self,
+        tracking_table: &str,
+        seed_set: &str,
+        table_name: &str,
+        row_key: &str,
+        row_values: &str,
+    ) -> Result<(), String> {
+        let safe = sanitize_identifier(tracking_table);
+        let sql = format!(
+            "INSERT INTO \"{}_rows\" (seed_set, table_name, row_key, row_values) VALUES ($1, $2, $3, $4) \
+             ON CONFLICT(seed_set, table_name, row_key) DO UPDATE SET row_values = $4, applied_at = NOW()",
+            safe
+        );
+        self.client
+            .execute(&sql, &[&seed_set, &table_name, &row_key, &row_values])
+            .map_err(|e| format!("storing tracked row: {}", e))?;
+        Ok(())
+    }
+
+    fn get_tracked_rows(
+        &mut self,
+        tracking_table: &str,
+        seed_set: &str,
+        table_name: &str,
+    ) -> Result<Vec<(String, String)>, String> {
+        let safe = sanitize_identifier(tracking_table);
+        let sql = format!(
+            "SELECT row_key, row_values FROM \"{}_rows\" WHERE seed_set = $1 AND table_name = $2",
+            safe
+        );
+        let rows = self
+            .client
+            .query(&sql, &[&seed_set, &table_name])
+            .map_err(|e| format!("querying tracked rows: {}", e))?;
+        Ok(rows
+            .iter()
+            .map(|r| (r.get::<_, String>(0), r.get::<_, String>(1)))
+            .collect())
+    }
+
+    fn delete_tracked_row(
+        &mut self,
+        tracking_table: &str,
+        seed_set: &str,
+        table_name: &str,
+        row_key: &str,
+    ) -> Result<(), String> {
+        let safe = sanitize_identifier(tracking_table);
+        let sql = format!(
+            "DELETE FROM \"{}_rows\" WHERE seed_set = $1 AND table_name = $2 AND row_key = $3",
+            safe
+        );
+        self.client
+            .execute(&sql, &[&seed_set, &table_name, &row_key])
+            .map_err(|e| format!("deleting tracked row: {}", e))?;
+        Ok(())
+    }
+
+    fn delete_all_tracked_rows(
+        &mut self,
+        tracking_table: &str,
+        seed_set: &str,
+    ) -> Result<(), String> {
+        let safe = sanitize_identifier(tracking_table);
+        let sql = format!("DELETE FROM \"{}_rows\" WHERE seed_set = $1", safe);
+        self.client
+            .execute(&sql, &[&seed_set])
+            .map_err(|e| format!("deleting all tracked rows: {}", e))?;
+        Ok(())
+    }
+
+    fn update_row(
+        &mut self,
+        table: &str,
+        set_columns: &[String],
+        set_values: &[String],
+        where_columns: &[String],
+        where_values: &[String],
+    ) -> Result<u64, String> {
+        let set_clause: Vec<String> = set_columns
+            .iter()
+            .zip(set_values.iter())
+            .map(|(c, v)| format!("\"{}\" = {}", sanitize_identifier(c), escape_sql_value(v)))
+            .collect();
+        let where_clause: Vec<String> = where_columns
+            .iter()
+            .zip(where_values.iter())
+            .map(|(c, v)| format!("\"{}\" = {}", sanitize_identifier(c), escape_sql_value(v)))
+            .collect();
+        let sql = format!(
+            "UPDATE \"{}\" SET {} WHERE {}",
+            sanitize_identifier(table),
+            set_clause.join(", "),
+            where_clause.join(" AND ")
+        );
+        let count = self
+            .client
+            .execute(&sql, &[])
+            .map_err(|e| format!("updating row in '{}': {}", table, e))?;
+        Ok(count)
+    }
+
+    fn get_row_columns(
+        &mut self,
+        table: &str,
+        key_columns: &[String],
+        key_values: &[String],
+        fetch_columns: &[String],
+    ) -> Result<Option<Vec<String>>, String> {
+        if fetch_columns.is_empty() {
+            return Ok(None);
+        }
+        let select_cols: Vec<String> = fetch_columns
+            .iter()
+            .map(|c| format!("CAST(\"{}\" AS TEXT)", sanitize_identifier(c)))
+            .collect();
+        let where_clause: Vec<String> = key_columns
+            .iter()
+            .zip(key_values.iter())
+            .map(|(c, v)| format!("\"{}\" = {}", sanitize_identifier(c), escape_sql_value(v)))
+            .collect();
+        let sql = format!(
+            "SELECT {} FROM \"{}\" WHERE {}",
+            select_cols.join(", "),
+            sanitize_identifier(table),
+            where_clause.join(" AND ")
+        );
+        let rows = self
+            .client
+            .query(&sql, &[])
+            .map_err(|e| format!("getting row from '{}': {}", table, e))?;
+        if rows.is_empty() {
+            Ok(None)
+        } else {
+            let mut vals = Vec::new();
+            for i in 0..fetch_columns.len() {
+                let v: Option<String> = rows[0].get(i);
+                vals.push(v.unwrap_or_default());
+            }
+            Ok(Some(vals))
+        }
+    }
+
+    fn delete_row_by_key(
+        &mut self,
+        table: &str,
+        key_columns: &[String],
+        key_values: &[String],
+    ) -> Result<u64, String> {
+        let where_clause: Vec<String> = key_columns
+            .iter()
+            .zip(key_values.iter())
+            .map(|(c, v)| format!("\"{}\" = {}", sanitize_identifier(c), escape_sql_value(v)))
+            .collect();
+        let sql = format!(
+            "DELETE FROM \"{}\" WHERE {}",
+            sanitize_identifier(table),
+            where_clause.join(" AND ")
+        );
+        let count = self
+            .client
+            .execute(&sql, &[])
+            .map_err(|e| format!("deleting row from '{}': {}", table, e))?;
+        Ok(count)
+    }
 }
 
 #[cfg(feature = "mysql")]
@@ -694,6 +1284,273 @@ impl Database for MysqlDb {
 
     fn driver_name(&self) -> &str {
         "mysql"
+    }
+
+    fn migrate_tracking_table(&mut self, table_name: &str) -> Result<(), String> {
+        let safe = sanitize_identifier(table_name);
+        // MySQL: ALTER TABLE ADD COLUMN IF NOT EXISTS is not supported in older versions.
+        // Check information_schema first.
+        use mysql::prelude::Queryable;
+        let check_sql = format!(
+            "SELECT COUNT(*) FROM information_schema.columns \
+             WHERE table_schema = DATABASE() AND table_name = '{}' AND column_name = 'content_hash'",
+            safe
+        );
+        let count: Option<i64> = self
+            .conn
+            .exec_first(&check_sql, ())
+            .map_err(|e| format!("checking tracking table schema: {}", e))?;
+        if count.unwrap_or(0) == 0 {
+            let alter = format!("ALTER TABLE `{}` ADD COLUMN content_hash TEXT", safe);
+            self.conn
+                .query_drop(&alter)
+                .map_err(|e| format!("migrating tracking table: {}", e))?;
+        }
+        Ok(())
+    }
+
+    fn ensure_row_tracking_table(&mut self, table_name: &str) -> Result<(), String> {
+        let safe = sanitize_identifier(table_name);
+        let sql = format!(
+            "CREATE TABLE IF NOT EXISTS `{}_rows` (
+                seed_set VARCHAR(255) NOT NULL,
+                table_name VARCHAR(255) NOT NULL,
+                row_key TEXT NOT NULL,
+                row_values TEXT NOT NULL,
+                applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                row_key_hash BINARY(32) GENERATED ALWAYS AS (UNHEX(SHA2(row_key, 256))) STORED,
+                PRIMARY KEY (seed_set, table_name, row_key_hash)
+            )",
+            safe
+        );
+        use mysql::prelude::Queryable;
+        self.conn
+            .query_drop(&sql)
+            .map_err(|e| format!("creating row tracking table: {}", e))?;
+        Ok(())
+    }
+
+    fn get_seed_hash(
+        &mut self,
+        table_name: &str,
+        seed_set: &str,
+    ) -> Result<Option<String>, String> {
+        let sql = format!(
+            "SELECT content_hash FROM `{}` WHERE seed_set = ?",
+            sanitize_identifier(table_name)
+        );
+        use mysql::prelude::Queryable;
+        let result: Option<Option<String>> = self
+            .conn
+            .exec_first(&sql, (seed_set,))
+            .map_err(|e| format!("getting seed hash: {}", e))?;
+        Ok(result.flatten())
+    }
+
+    fn update_seed_entry(
+        &mut self,
+        table_name: &str,
+        seed_set: &str,
+        hash: &str,
+    ) -> Result<(), String> {
+        let safe = sanitize_identifier(table_name);
+        let sql = format!(
+            "INSERT INTO `{}` (seed_set, content_hash) VALUES (?, ?) \
+             ON DUPLICATE KEY UPDATE content_hash = VALUES(content_hash), applied_at = CURRENT_TIMESTAMP",
+            safe
+        );
+        use mysql::prelude::Queryable;
+        self.conn
+            .exec_drop(&sql, (seed_set, hash))
+            .map_err(|e| format!("updating seed entry: {}", e))?;
+        Ok(())
+    }
+
+    fn store_tracked_row(
+        &mut self,
+        tracking_table: &str,
+        seed_set: &str,
+        table_name: &str,
+        row_key: &str,
+        row_values: &str,
+    ) -> Result<(), String> {
+        let safe = sanitize_identifier(tracking_table);
+        let sql = format!(
+            "INSERT INTO `{}_rows` (seed_set, table_name, row_key, row_values) VALUES (?, ?, ?, ?) \
+             ON DUPLICATE KEY UPDATE row_values = VALUES(row_values), applied_at = CURRENT_TIMESTAMP",
+            safe
+        );
+        use mysql::prelude::Queryable;
+        self.conn
+            .exec_drop(&sql, (seed_set, table_name, row_key, row_values))
+            .map_err(|e| format!("storing tracked row: {}", e))?;
+        Ok(())
+    }
+
+    fn get_tracked_rows(
+        &mut self,
+        tracking_table: &str,
+        seed_set: &str,
+        table_name: &str,
+    ) -> Result<Vec<(String, String)>, String> {
+        let safe = sanitize_identifier(tracking_table);
+        let sql = format!(
+            "SELECT row_key, row_values FROM `{}_rows` WHERE seed_set = ? AND table_name = ?",
+            safe
+        );
+        use mysql::prelude::Queryable;
+        let rows: Vec<(String, String)> = self
+            .conn
+            .exec(&sql, (seed_set, table_name))
+            .map_err(|e| format!("querying tracked rows: {}", e))?;
+        Ok(rows)
+    }
+
+    fn delete_tracked_row(
+        &mut self,
+        tracking_table: &str,
+        seed_set: &str,
+        table_name: &str,
+        row_key: &str,
+    ) -> Result<(), String> {
+        let safe = sanitize_identifier(tracking_table);
+        let sql = format!(
+            "DELETE FROM `{}_rows` WHERE seed_set = ? AND table_name = ? AND row_key = ?",
+            safe
+        );
+        use mysql::prelude::Queryable;
+        self.conn
+            .exec_drop(&sql, (seed_set, table_name, row_key))
+            .map_err(|e| format!("deleting tracked row: {}", e))?;
+        Ok(())
+    }
+
+    fn delete_all_tracked_rows(
+        &mut self,
+        tracking_table: &str,
+        seed_set: &str,
+    ) -> Result<(), String> {
+        let safe = sanitize_identifier(tracking_table);
+        let sql = format!("DELETE FROM `{}_rows` WHERE seed_set = ?", safe);
+        use mysql::prelude::Queryable;
+        self.conn
+            .exec_drop(&sql, (seed_set,))
+            .map_err(|e| format!("deleting all tracked rows: {}", e))?;
+        Ok(())
+    }
+
+    fn update_row(
+        &mut self,
+        table: &str,
+        set_columns: &[String],
+        set_values: &[String],
+        where_columns: &[String],
+        where_values: &[String],
+    ) -> Result<u64, String> {
+        let set_clause: Vec<String> = set_columns
+            .iter()
+            .map(|c| format!("`{}` = ?", sanitize_identifier(c)))
+            .collect();
+        let where_clause: Vec<String> = where_columns
+            .iter()
+            .map(|c| format!("`{}` = ?", sanitize_identifier(c)))
+            .collect();
+        let sql = format!(
+            "UPDATE `{}` SET {} WHERE {}",
+            sanitize_identifier(table),
+            set_clause.join(", "),
+            where_clause.join(" AND ")
+        );
+        use mysql::prelude::Queryable;
+        let params: Vec<mysql::Value> = set_values
+            .iter()
+            .chain(where_values.iter())
+            .map(|v| mysql::Value::from(v.as_str()))
+            .collect();
+        self.conn
+            .exec_drop(&sql, &params)
+            .map_err(|e| format!("updating row in '{}': {}", table, e))?;
+        let affected: Option<u64> = self
+            .conn
+            .exec_first("SELECT ROW_COUNT()", ())
+            .map_err(|e| format!("getting affected rows: {}", e))?;
+        Ok(affected.unwrap_or(0))
+    }
+
+    fn get_row_columns(
+        &mut self,
+        table: &str,
+        key_columns: &[String],
+        key_values: &[String],
+        fetch_columns: &[String],
+    ) -> Result<Option<Vec<String>>, String> {
+        if fetch_columns.is_empty() {
+            return Ok(None);
+        }
+        let select_cols: Vec<String> = fetch_columns
+            .iter()
+            .map(|c| format!("CAST(`{}` AS CHAR)", sanitize_identifier(c)))
+            .collect();
+        let where_clause: Vec<String> = key_columns
+            .iter()
+            .map(|c| format!("`{}` = ?", sanitize_identifier(c)))
+            .collect();
+        let sql = format!(
+            "SELECT {} FROM `{}` WHERE {}",
+            select_cols.join(", "),
+            sanitize_identifier(table),
+            where_clause.join(" AND ")
+        );
+        use mysql::prelude::Queryable;
+        let params: Vec<mysql::Value> = key_values
+            .iter()
+            .map(|v| mysql::Value::from(v.as_str()))
+            .collect();
+        let row: Option<mysql::Row> = self
+            .conn
+            .exec_first(&sql, &params)
+            .map_err(|e| format!("getting row from '{}': {}", table, e))?;
+        match row {
+            Some(r) => {
+                let mut vals = Vec::new();
+                for i in 0..fetch_columns.len() {
+                    let v: Option<String> = r.get(i);
+                    vals.push(v.unwrap_or_default());
+                }
+                Ok(Some(vals))
+            }
+            None => Ok(None),
+        }
+    }
+
+    fn delete_row_by_key(
+        &mut self,
+        table: &str,
+        key_columns: &[String],
+        key_values: &[String],
+    ) -> Result<u64, String> {
+        let where_clause: Vec<String> = key_columns
+            .iter()
+            .map(|c| format!("`{}` = ?", sanitize_identifier(c)))
+            .collect();
+        let sql = format!(
+            "DELETE FROM `{}` WHERE {}",
+            sanitize_identifier(table),
+            where_clause.join(" AND ")
+        );
+        use mysql::prelude::Queryable;
+        let params: Vec<mysql::Value> = key_values
+            .iter()
+            .map(|v| mysql::Value::from(v.as_str()))
+            .collect();
+        self.conn
+            .exec_drop(&sql, &params)
+            .map_err(|e| format!("deleting row from '{}': {}", table, e))?;
+        let affected: Option<u64> = self
+            .conn
+            .exec_first("SELECT ROW_COUNT()", ())
+            .map_err(|e| format!("getting affected rows: {}", e))?;
+        Ok(affected.unwrap_or(0))
     }
 }
 
