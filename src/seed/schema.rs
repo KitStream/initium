@@ -121,6 +121,8 @@ pub struct TableSeed {
     #[serde(default)]
     pub unique_key: Vec<String>,
     #[serde(default)]
+    pub ignore_columns: Vec<String>,
+    #[serde(default)]
     pub auto_id: Option<AutoIdConfig>,
     pub rows: Vec<HashMap<String, serde_yaml::Value>>,
 }
@@ -255,6 +257,20 @@ impl SeedPlan {
                         "table '{}' in seed_set '{}' uses reserved column '{}' in unique_key when mode is 'reconcile'",
                         ts.table, ss.name, reserved
                     ));
+                }
+                if ts.ignore_columns.iter().any(|c| c.trim().is_empty()) {
+                    return Err(format!(
+                        "table '{}' in seed_set '{}' has empty or whitespace-only entries in ignore_columns",
+                        ts.table, ss.name
+                    ));
+                }
+                for ic in &ts.ignore_columns {
+                    if ts.unique_key.contains(ic) {
+                        return Err(format!(
+                            "table '{}' in seed_set '{}': column '{}' cannot be in both unique_key and ignore_columns",
+                            ts.table, ss.name, ic
+                        ));
+                    }
                 }
                 for (row_idx, row) in ts.rows.iter().enumerate() {
                     for uk in &ts.unique_key {
@@ -737,5 +753,71 @@ phases:
 "#;
         let err = SeedPlan::from_yaml(yaml).unwrap_err();
         assert!(err.contains("missing unique_key column 'email'"));
+    }
+
+    #[test]
+    fn test_reconcile_rejects_ignore_columns_overlapping_unique_key() {
+        let yaml = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: p
+    seed_sets:
+      - name: s
+        mode: reconcile
+        tables:
+          - table: t
+            unique_key: [email]
+            ignore_columns: [email]
+            rows:
+              - email: alice@co.com
+"#;
+        let err = SeedPlan::from_yaml(yaml).unwrap_err();
+        assert!(err.contains("cannot be in both unique_key and ignore_columns"));
+    }
+
+    #[test]
+    fn test_reconcile_rejects_empty_ignore_columns_entry() {
+        let yaml = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: p
+    seed_sets:
+      - name: s
+        mode: reconcile
+        tables:
+          - table: t
+            unique_key: [email]
+            ignore_columns: [""]
+            rows:
+              - email: alice@co.com
+"#;
+        let err = SeedPlan::from_yaml(yaml).unwrap_err();
+        assert!(err.contains("empty or whitespace-only entries in ignore_columns"));
+    }
+
+    #[test]
+    fn test_reconcile_accepts_valid_ignore_columns() {
+        let yaml = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: p
+    seed_sets:
+      - name: s
+        mode: reconcile
+        tables:
+          - table: t
+            unique_key: [email]
+            ignore_columns: [updated_at]
+            rows:
+              - email: alice@co.com
+                updated_at: "2026-01-01"
+"#;
+        assert!(SeedPlan::from_yaml(yaml).is_ok());
     }
 }
