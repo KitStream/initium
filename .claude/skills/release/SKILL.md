@@ -1,3 +1,9 @@
+---
+name: release
+description: Release
+user_invocable: true
+---
+
 # Release
 
 Prepare a release PR for initium. This command handles version bumping, changelog updates, and PR creation. The release is published automatically when the PR merges (CI detects the version bump and creates the tag, which triggers the release workflow).
