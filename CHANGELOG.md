@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Docker dependency cache now survives version-only bumps by normalizing the root package version in a preparatory build stage.
 
+### Fixed
+- Auto Tag workflow now uses `RELEASE_TOKEN` instead of `GITHUB_TOKEN` so the pushed tag triggers the Release workflow. Tags pushed by the default `GITHUB_TOKEN` do not trigger other workflows (GitHub Actions security feature).
+
 ## [1.3.0] - 2026-03-12
 
 ### Added
