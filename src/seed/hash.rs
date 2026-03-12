@@ -43,6 +43,11 @@ pub fn compute_seed_set_hash(
                 if key.as_str() == "_ref" {
                     continue;
                 }
+                // Ignored columns don't affect the hash — changes to them
+                // won't trigger reconciliation.
+                if ts.ignore_columns.contains(key) {
+                    continue;
+                }
                 hasher.update(key.as_bytes());
                 hasher.update(b"=");
 
@@ -251,5 +256,51 @@ phases:
         let h1 = compute_seed_set_hash(&plan1.phases[0].seed_sets[0], &identity_resolver).unwrap();
         let h2 = compute_seed_set_hash(&plan2.phases[0].seed_sets[0], &identity_resolver).unwrap();
         assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_hash_ignores_ignored_columns() {
+        let yaml1 = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: p
+    seed_sets:
+      - name: s
+        mode: reconcile
+        tables:
+          - table: t
+            unique_key: [k]
+            ignore_columns: [note]
+            rows:
+              - k: a
+                note: "version 1"
+"#;
+        let yaml2 = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: p
+    seed_sets:
+      - name: s
+        mode: reconcile
+        tables:
+          - table: t
+            unique_key: [k]
+            ignore_columns: [note]
+            rows:
+              - k: a
+                note: "version 2"
+"#;
+        let plan1 = SeedPlan::from_yaml(yaml1).unwrap();
+        let plan2 = SeedPlan::from_yaml(yaml2).unwrap();
+        let h1 = compute_seed_set_hash(&plan1.phases[0].seed_sets[0], &identity_resolver).unwrap();
+        let h2 = compute_seed_set_hash(&plan2.phases[0].seed_sets[0], &identity_resolver).unwrap();
+        assert_eq!(
+            h1, h2,
+            "hash should be identical when only ignored columns change"
+        );
     }
 }

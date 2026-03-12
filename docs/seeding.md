@@ -250,6 +250,28 @@ initium seed --spec /seeds/seed.yaml --reconcile-all
    - **Changed rows** (different values for same unique key) are updated.
    - **Removed rows** (in DB but not in spec) are deleted.
 
+**Ignoring columns:** Some columns should be set on initial insert but never overwritten during reconciliation (e.g., timestamps, random tokens, or values managed by database triggers). Use `ignore_columns` to exclude them:
+
+```yaml
+tables:
+  - table: users
+    unique_key: [email]
+    ignore_columns: [created_at, api_token]
+    rows:
+      - email: alice@example.com
+        name: Alice
+        created_at: "2026-01-01"
+        api_token: "$env:ALICE_TOKEN"
+```
+
+Ignored columns are:
+- **Included** in the initial INSERT (the row is written with all columns).
+- **Excluded** from change detection (changing an ignored column's value in the spec does not trigger an update).
+- **Excluded** from UPDATE statements (manual or trigger-managed changes in the database are preserved).
+- **Excluded** from the content hash (so they don't affect the fast-path skip).
+
+`ignore_columns` cannot overlap with `unique_key`.
+
 **Requirements:**
 - Every table in a reconciled seed set must have a `unique_key`. Without it, there is no way to identify which rows correspond to which spec entries.
 - Environment variable changes trigger reconciliation (resolved values are compared, not raw templates).

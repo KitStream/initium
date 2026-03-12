@@ -481,8 +481,8 @@ impl<'a> SeedExecutor<'a> {
 
             // Build canonical row_key JSON (sorted by unique key column name)
             let row_key = build_row_key(&ts.unique_key, &unique_columns, &unique_values);
-            // Build row_values JSON (all columns, sorted)
-            let row_values_json = build_row_values(&columns, &values);
+            // Build row_values JSON (excluding ignored columns for comparison)
+            let row_values_json = build_row_values_excluding(&columns, &values, &ts.ignore_columns);
 
             seen_keys.insert(row_key.clone());
 
@@ -500,16 +500,16 @@ impl<'a> SeedExecutor<'a> {
                     continue;
                 }
 
-                // Values differ — UPDATE
+                // Values differ — UPDATE (exclude key columns and ignored columns)
                 let non_key_columns: Vec<String> = columns
                     .iter()
-                    .filter(|c| !ts.unique_key.contains(c))
+                    .filter(|c| !ts.unique_key.contains(c) && !ts.ignore_columns.contains(c))
                     .cloned()
                     .collect();
                 let non_key_values: Vec<String> = columns
                     .iter()
                     .zip(values.iter())
-                    .filter(|(c, _)| !ts.unique_key.contains(c))
+                    .filter(|(c, _)| !ts.unique_key.contains(c) && !ts.ignore_columns.contains(c))
                     .map(|(_, v)| v.clone())
                     .collect();
 
@@ -700,7 +700,8 @@ impl<'a> SeedExecutor<'a> {
                 }
 
                 let row_key = build_row_key(&ts.unique_key, &unique_columns, &unique_values);
-                let row_values_json = build_row_values(&columns, &values);
+                let row_values_json =
+                    build_row_values_excluding(&columns, &values, &ts.ignore_columns);
                 seen_keys.insert(row_key.clone());
 
                 match tracked_values.get(&row_key) {
@@ -740,11 +741,14 @@ fn build_row_key(unique_key_spec: &[String], columns: &[String], values: &[Strin
     serde_json::to_string(&map).unwrap_or_default()
 }
 
-/// Build a canonical JSON representation of all row values (sorted by column name).
-fn build_row_values(columns: &[String], values: &[String]) -> String {
+/// Build a canonical JSON representation of row values, excluding specified columns.
+/// Ignored columns are excluded from tracking so changes to them don't trigger reconciliation.
+fn build_row_values_excluding(columns: &[String], values: &[String], exclude: &[String]) -> String {
     let mut map = BTreeMap::new();
     for (i, col) in columns.iter().enumerate() {
-        map.insert(col.clone(), values[i].clone());
+        if !exclude.contains(col) {
+            map.insert(col.clone(), values[i].clone());
+        }
     }
     serde_json::to_string(&map).unwrap_or_default()
 }
@@ -2424,5 +2428,218 @@ phases:
         let result = exec.execute(&plan);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("no unique_key"));
+    }
+
+    #[test]
+    fn test_reconcile_ignore_columns_not_compared() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
+        sqlite
+            .conn
+            .execute_batch(
+                "CREATE TABLE config (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT);",
+            )
+            .unwrap();
+
+        // Initial apply with updated_at as ignored column
+        let yaml1 = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: phase1
+    seed_sets:
+      - name: config
+        mode: reconcile
+        tables:
+          - table: config
+            unique_key: [key]
+            ignore_columns: [updated_at]
+            rows:
+              - key: app_name
+                value: MyApp
+                updated_at: "2026-01-01"
+"#;
+        let plan1 = SeedPlan::from_yaml(yaml1).unwrap();
+        let log = test_logger();
+
+        let db1 = SqliteDb::connect(db_path_str).unwrap();
+        let mut exec1 = SeedExecutor::new(&log, Box::new(db1), "initium_seed".into(), false);
+        exec1.execute(&plan1).unwrap();
+
+        // Verify initial values
+        let db_check = SqliteDb::connect(db_path_str).unwrap();
+        let val: String = db_check
+            .conn
+            .query_row(
+                "SELECT updated_at FROM config WHERE key = 'app_name'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(val, "2026-01-01");
+
+        // Change the ignored column value — should NOT trigger an update
+        let yaml2 = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: phase1
+    seed_sets:
+      - name: config
+        mode: reconcile
+        tables:
+          - table: config
+            unique_key: [key]
+            ignore_columns: [updated_at]
+            rows:
+              - key: app_name
+                value: MyApp
+                updated_at: "2026-12-31"
+"#;
+        let plan2 = SeedPlan::from_yaml(yaml2).unwrap();
+        let db2 = SqliteDb::connect(db_path_str).unwrap();
+        let mut exec2 = SeedExecutor::new(&log, Box::new(db2), "initium_seed".into(), false);
+        exec2.execute(&plan2).unwrap();
+
+        // updated_at should remain unchanged (ignored column not updated)
+        let db_final = SqliteDb::connect(db_path_str).unwrap();
+        let val: String = db_final
+            .conn
+            .query_row(
+                "SELECT updated_at FROM config WHERE key = 'app_name'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(val, "2026-01-01");
+    }
+
+    #[test]
+    fn test_reconcile_ignore_columns_still_inserted() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
+        sqlite
+            .conn
+            .execute_batch("CREATE TABLE items (name TEXT PRIMARY KEY, note TEXT);")
+            .unwrap();
+
+        let yaml = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: phase1
+    seed_sets:
+      - name: items
+        mode: reconcile
+        tables:
+          - table: items
+            unique_key: [name]
+            ignore_columns: [note]
+            rows:
+              - name: item1
+                note: "initial note"
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        let log = test_logger();
+
+        let db1 = SqliteDb::connect(db_path_str).unwrap();
+        let mut exec = SeedExecutor::new(&log, Box::new(db1), "initium_seed".into(), false);
+        exec.execute(&plan).unwrap();
+
+        // Ignored column should still be present on initial insert
+        let db_check = SqliteDb::connect(db_path_str).unwrap();
+        let note: String = db_check
+            .conn
+            .query_row("SELECT note FROM items WHERE name = 'item1'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(note, "initial note");
+    }
+
+    #[test]
+    fn test_reconcile_ignore_columns_non_ignored_still_updated() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let sqlite = SqliteDb::connect(db_path_str).unwrap();
+        sqlite
+            .conn
+            .execute_batch(
+                "CREATE TABLE config (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT);",
+            )
+            .unwrap();
+
+        // Initial
+        let yaml1 = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: phase1
+    seed_sets:
+      - name: config
+        mode: reconcile
+        tables:
+          - table: config
+            unique_key: [key]
+            ignore_columns: [updated_at]
+            rows:
+              - key: setting1
+                value: old_value
+                updated_at: "2026-01-01"
+"#;
+        let plan1 = SeedPlan::from_yaml(yaml1).unwrap();
+        let log = test_logger();
+
+        let db1 = SqliteDb::connect(db_path_str).unwrap();
+        let mut exec1 = SeedExecutor::new(&log, Box::new(db1), "initium_seed".into(), false);
+        exec1.execute(&plan1).unwrap();
+
+        // Change value (non-ignored) — should trigger update, but NOT touch updated_at
+        let yaml2 = r#"
+database:
+  driver: sqlite
+  url: ":memory:"
+phases:
+  - name: phase1
+    seed_sets:
+      - name: config
+        mode: reconcile
+        tables:
+          - table: config
+            unique_key: [key]
+            ignore_columns: [updated_at]
+            rows:
+              - key: setting1
+                value: new_value
+                updated_at: "2026-12-31"
+"#;
+        let plan2 = SeedPlan::from_yaml(yaml2).unwrap();
+        let db2 = SqliteDb::connect(db_path_str).unwrap();
+        let mut exec2 = SeedExecutor::new(&log, Box::new(db2), "initium_seed".into(), false);
+        exec2.execute(&plan2).unwrap();
+
+        let db_final = SqliteDb::connect(db_path_str).unwrap();
+        let (value, updated_at): (String, String) = db_final
+            .conn
+            .query_row(
+                "SELECT value, updated_at FROM config WHERE key = 'setting1'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(value, "new_value"); // Non-ignored column updated
+        assert_eq!(updated_at, "2026-01-01"); // Ignored column preserved
     }
 }
