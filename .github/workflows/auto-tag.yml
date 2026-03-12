@@ -10,6 +10,12 @@ jobs:
   tag:
     runs-on: ubuntu-latest
     steps:
+      - name: Verify RELEASE_TOKEN is configured
+        run: |
+          if [ -z "${{ secrets.RELEASE_TOKEN }}" ]; then
+            echo "::error::RELEASE_TOKEN secret is not configured. Tags pushed with the default GITHUB_TOKEN cannot trigger the Release workflow."
+            exit 1
+          fi
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -52,5 +58,3 @@ jobs:
             echo "Failed to push tag $TAG"
             exit 1
           fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
