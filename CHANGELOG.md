@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Docker dependency cache now survives version-only bumps by normalizing the root package version in a preparatory build stage.
+
 ## [1.3.0] - 2026-03-12
 
 ### Added
