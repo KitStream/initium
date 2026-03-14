@@ -237,6 +237,38 @@ mod tests {
     }
 
     #[test]
+    fn test_template_urlencode_basic() {
+        let mut env = minijinja::Environment::new();
+        register(&mut env);
+        env.add_template("t", r#"{{ "hello world" | urlencode }}"#)
+            .unwrap();
+        let tmpl = env.get_template("t").unwrap();
+        let result = tmpl.render(minijinja::context!()).unwrap();
+        assert_eq!(result, "hello%20world");
+    }
+
+    #[test]
+    fn test_template_urlencode_special_chars() {
+        let mut env = minijinja::Environment::new();
+        register(&mut env);
+        env.add_template("t", r#"{{ "p@ss%word" | urlencode }}"#)
+            .unwrap();
+        let tmpl = env.get_template("t").unwrap();
+        let result = tmpl.render(minijinja::context!()).unwrap();
+        assert_eq!(result, "p%40ss%25word");
+    }
+
+    #[test]
+    fn test_template_urlencode_empty() {
+        let mut env = minijinja::Environment::new();
+        register(&mut env);
+        env.add_template("t", r#"{{ "" | urlencode }}"#).unwrap();
+        let tmpl = env.get_template("t").unwrap();
+        let result = tmpl.render(minijinja::context!()).unwrap();
+        assert_eq!(result, "");
+    }
+
+    #[test]
     fn test_template_chained_base64_roundtrip() {
         let mut env = minijinja::Environment::new();
         register(&mut env);

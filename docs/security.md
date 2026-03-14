@@ -5,10 +5,12 @@
 Initium runs as an initContainer in Kubernetes pods. Its threat model considers:
 
 ### Trusted
+
 - The cluster operator who configures the pod spec and Initium arguments
 - The container registry serving the Initium image (verified via image signatures/SBOM)
 
 ### Untrusted
+
 - Network endpoints that Initium connects to (may be malicious or compromised)
 - Environment variables that may contain secrets (must not be leaked)
 - File paths provided by users (may attempt path traversal)
@@ -87,4 +89,3 @@ cosign verify-attestation \
 # View SBOM
 docker buildx imagetools inspect ghcr.io/kitstream/initium:latest --format '{{json .SBOM}}'
 ```
-

@@ -138,7 +138,13 @@ args: ["--json", "wait-for", "--target", "tcp://postgres:5432"]
 Output looks like:
 
 ```json
-{"time":"2026-01-15T10:30:00Z","level":"INFO","msg":"target is reachable","target":"tcp://postgres:5432","attempts":"1"}
+{
+  "time": "2026-01-15T10:30:00Z",
+  "level": "INFO",
+  "msg": "target is reachable",
+  "target": "tcp://postgres:5432",
+  "attempts": "1"
+}
 ```
 
 This is useful when you're shipping logs to a centralized system like Loki, Datadog, or Elasticsearch.
@@ -459,4 +465,3 @@ Common causes:
 ### Does Initium support ARM-based nodes (e.g., AWS Graviton)?
 
 Yes. The container image is built for both `linux/amd64` and `linux/arm64`. Kubernetes pulls the correct architecture automatically via the multi-arch manifest.
-

@@ -15,6 +15,7 @@ If you discover a security vulnerability in Initium, please report it responsibl
 Instead, email: **security@kitstream.dev**
 
 Include:
+
 - Description of the vulnerability
 - Steps to reproduce
 - Impact assessment
@@ -36,4 +37,3 @@ Initium is designed with security as a first-class concern:
 - **Minimal base image**: built `FROM scratch` with only CA certificates
 
 See [docs/security.md](docs/security.md) for the full threat model.
-

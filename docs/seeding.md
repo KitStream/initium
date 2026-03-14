@@ -95,10 +95,10 @@ phases:
 
 | Object type | SQLite | PostgreSQL | MySQL |
 | ----------- | ------ | ---------- | ----- |
-| `table`     | ✅      | ✅          | ✅     |
-| `view`      | ✅      | ✅          | ✅     |
-| `schema`    | ❌      | ✅          | ✅*    |
-| `database`  | ❌      | ✅          | ✅*    |
+| `table`     | ✅     | ✅         | ✅    |
+| `view`      | ✅     | ✅         | ✅    |
+| `schema`    | ❌     | ✅         | ✅*   |
+| `database`  | ❌     | ✅         | ✅*   |
 
 \* In MySQL, `schema` and `database` are synonymous.
 
@@ -106,8 +106,8 @@ phases:
 
 | Operation         | SQLite | PostgreSQL | MySQL |
 | ----------------- | ------ | ---------- | ----- |
-| `CREATE DATABASE` | ❌      | ✅          | ✅     |
-| `CREATE SCHEMA`   | ❌      | ✅          | ✅*    |
+| `CREATE DATABASE` | ❌     | ✅         | ✅    |
+| `CREATE SCHEMA`   | ❌     | ✅         | ✅*   |
 
 \* In MySQL, `CREATE SCHEMA` maps to `CREATE DATABASE`.
 
@@ -265,6 +265,7 @@ tables:
 ```
 
 Ignored columns are:
+
 - **Included** in the initial INSERT (the row is written with all columns).
 - **Excluded** from change detection (changing an ignored column's value in the spec does not trigger an update).
 - **Excluded** from UPDATE statements (manual or trigger-managed changes in the database are preserved).
@@ -273,6 +274,7 @@ Ignored columns are:
 `ignore_columns` cannot overlap with `unique_key`.
 
 **Requirements:**
+
 - Every table in a reconciled seed set must have a `unique_key`. Without it, there is no way to identify which rows correspond to which spec entries.
 - Environment variable changes trigger reconciliation (resolved values are compared, not raw templates).
 
@@ -349,13 +351,13 @@ spec:
 
 ## CLI Reference
 
-| Flag               | Default    | Description                                               |
-| ------------------ | ---------- | --------------------------------------------------------- |
-| `--spec`           | (required) | Path to seed spec file (YAML or JSON)                     |
-| `--reset`          | `false`    | Delete existing data and re-apply seeds                   |
-| `--dry-run`        | `false`    | Preview changes without modifying the database            |
-| `--reconcile-all`  | `false`    | Override all seed sets to reconcile mode for this run      |
-| `--json`           | `false`    | Enable JSON log output                                    |
+| Flag              | Default    | Description                                           |
+| ----------------- | ---------- | ----------------------------------------------------- |
+| `--spec`          | (required) | Path to seed spec file (YAML or JSON)                 |
+| `--reset`         | `false`    | Delete existing data and re-apply seeds               |
+| `--dry-run`       | `false`    | Preview changes without modifying the database        |
+| `--reconcile-all` | `false`    | Override all seed sets to reconcile mode for this run |
+| `--json`          | `false`    | Enable JSON log output                                |
 
 ## Failure Modes
 

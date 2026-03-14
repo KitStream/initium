@@ -50,6 +50,21 @@ Decode a Base64 string back to its original value. Returns an error if the input
 {# → hello world #}
 ```
 
+### `urlencode`
+
+Percent-encode a string for safe use in URLs. Encodes all characters except unreserved ones (letters, digits, `-`, `_`, `.`, `~`) using `%XX` notation.
+
+```jinja
+{{ env.DB_PASSWORD | urlencode }}
+{# "p@ss%word" → "p%40ss%25word" #}
+```
+
+This is especially useful when embedding values that may contain URL-reserved characters (`@`, `%`, `:`, `/`, `?`, `#`, etc.) into connection strings:
+
+```jinja
+postgresql://{{ env.DB_USER }}:{{ env.DB_PASSWORD | urlencode }}@db:5432/mydb
+```
+
 ## Chaining Filters
 
 Filters can be chained to compose operations:
