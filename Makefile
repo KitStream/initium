@@ -1,7 +1,7 @@
 BINARY   := initium
 VERSION  ?= dev
 IMAGE    ?= ghcr.io/kitstream/initium
-COSIGN_IDENTITY := https://github.com/KitStream/initium/.github/workflows/release.yml@refs/tags/v*
+COSIGN_IDENTITY := https://github.com/KitStream/initium/.github/workflows/release.yml@refs/tags/v$(VERSION)
 .PHONY: all build test lint clean verify-image
 all: lint test build
 build:
