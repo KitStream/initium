@@ -3,10 +3,18 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Dry run — build and verify without pushing images or publishing"
+        type: boolean
+        default: true
 permissions:
   contents: read
   packages: write
   id-token: write
+env:
+  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run == true }}
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -56,49 +64,67 @@ jobs:
           name: initium-arm64
           path: bin/
       - run: mv bin/initium bin/initium-arm64 && chmod +x bin/initium-arm64
+      - name: Verify binaries
+        run: |
+          file bin/initium-amd64 bin/initium-arm64
+          echo "amd64 size: $(du -h bin/initium-amd64 | cut -f1)"
+          echo "arm64 size: $(du -h bin/initium-arm64 | cut -f1)"
       - uses: sigstore/cosign-installer@v3
+        if: env.DRY_RUN == 'false'
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
+        if: env.DRY_RUN == 'false'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Extract version
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
-      - uses: docker/build-push-action@v6
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "VERSION=dry-run-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build initium image
+        uses: docker/build-push-action@v6
         id: build-main
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: ${{ env.DRY_RUN == 'false' }}
           tags: |
             ghcr.io/kitstream/initium:${{ steps.version.outputs.VERSION }}
             ghcr.io/kitstream/initium:latest
           sbom: true
           provenance: true
       - name: Sign initium image
+        if: env.DRY_RUN == 'false'
         run: cosign sign --yes ghcr.io/kitstream/initium@${{ steps.build-main.outputs.digest }}
       - name: SBOM attestation for initium image
+        if: env.DRY_RUN == 'false'
         run: |
           cosign attest --yes --type spdx \
             --predicate <(docker buildx imagetools inspect ghcr.io/kitstream/initium@${{ steps.build-main.outputs.digest }} --format '{{json (index .SBOM "linux/amd64").SPDX}}') \
             ghcr.io/kitstream/initium@${{ steps.build-main.outputs.digest }}
-      - uses: docker/build-push-action@v6
+      - name: Build initium-jyq image
+        uses: docker/build-push-action@v6
         id: build-jyq
         with:
           context: .
           file: Dockerfile.jyq
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: ${{ env.DRY_RUN == 'false' }}
           tags: |
             ghcr.io/kitstream/initium-jyq:${{ steps.version.outputs.VERSION }}
             ghcr.io/kitstream/initium-jyq:latest
           sbom: true
           provenance: true
       - name: Sign initium-jyq image
+        if: env.DRY_RUN == 'false'
         run: cosign sign --yes ghcr.io/kitstream/initium-jyq@${{ steps.build-jyq.outputs.digest }}
       - name: SBOM attestation for initium-jyq image
+        if: env.DRY_RUN == 'false'
         run: |
           cosign attest --yes --type spdx \
             --predicate <(docker buildx imagetools inspect ghcr.io/kitstream/initium-jyq@${{ steps.build-jyq.outputs.digest }} --format '{{json (index .SBOM "linux/amd64").SPDX}}') \
@@ -106,6 +132,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     needs: [docker]
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry-run == true) }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
