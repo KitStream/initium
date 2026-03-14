@@ -31,35 +31,37 @@ The seed spec file defines the complete seeding plan. Both YAML and JSON formats
 
 ```yaml
 database:
-  driver: postgres                 # Required. One of: postgres, mysql, sqlite
-  url: "postgres://..."            # Direct database URL
-  url_env: DATABASE_URL            # Or: name of env var containing the URL
-  tracking_table: initium_seed     # Default: "initium_seed"
+  driver: postgres # Required. One of: postgres, mysql, sqlite
+  url: "postgres://..." # Direct database URL
+  url_env: DATABASE_URL # Or: name of env var containing the URL
+  tracking_table: initium_seed # Default: "initium_seed"
 
 phases:
-  - name: setup                    # Required. Phase name.
-    order: 1                       # Optional. Execution order (default: 0).
-    database: reporting            # Optional. Database to target/create.
-    schema: analytics              # Optional. Schema to target/create.
-    create_if_missing: true        # Optional. Create database/schema if missing.
-    timeout: 30s                    # Optional. Default wait timeout (e.g. 30s, 1m; default: 30s).
-    wait_for:                      # Optional. Objects to wait for before seeding.
-      - type: table                # One of: table, view, schema, database.
+  - name: setup # Required. Phase name.
+    order: 1 # Optional. Execution order (default: 0).
+    database: reporting # Optional. Database to target/create.
+    schema: analytics # Optional. Schema to target/create.
+    create_if_missing: true # Optional. Create database/schema if missing.
+    timeout: 30s # Optional. Default wait timeout (e.g. 30s, 1m; default: 30s).
+    wait_for: # Optional. Objects to wait for before seeding.
+      - type: table # One of: table, view, schema, database.
         name: users
-        timeout: 60s               # Optional. Per-object timeout override.
-    seed_sets:                     # Optional. Seed sets to apply in this phase.
+        timeout: 60s # Optional. Per-object timeout override.
+    seed_sets: # Optional. Seed sets to apply in this phase.
       - name: initial_data
-        order: 1                   # Optional. Controls execution order across seed sets.
-        mode: once                 # Optional. "once" (default) or "reconcile".
+        order: 1 # Optional. Controls execution order across seed sets.
+        mode: once # Optional. "once" (default) or "reconcile".
         tables:
           - table: config
-            order: 1               # Optional. Controls execution order within a seed set.
-            unique_key: [email]    # Optional. Columns used for duplicate detection.
-            auto_id:               # Optional. Auto-generated ID configuration.
-              column: id           # Column name for the auto-generated ID.
-              id_type: integer     # ID type (default: integer).
+            order: 1 # Optional. Controls execution order within a seed set.
+            unique_key: [
+              email,
+            ] # Optional. Columns used for duplicate detection.
+            auto_id: # Optional. Auto-generated ID configuration.
+              column: id # Column name for the auto-generated ID.
+              id_type: integer # ID type (default: integer).
             rows:
-              - _ref: row_alias    # Optional. Internal reference name for this row.
+              - _ref: row_alias # Optional. Internal reference name for this row.
                 key: app_name
                 value: "{{ env.APP_NAME }}"
 ```
@@ -176,7 +178,7 @@ tables:
     unique_key: [email]
     rows:
       - name: Alice
-        email: alice@example.com    # Skipped if email already exists
+        email: alice@example.com # Skipped if email already exists
 ```
 
 ### Auto-Generated IDs and Cross-Table References
@@ -194,7 +196,7 @@ phases:
             auto_id:
               column: id
             rows:
-              - _ref: dept_eng            # Name this row for later reference
+              - _ref: dept_eng # Name this row for later reference
                 name: Engineering
 
           - table: employees
@@ -202,7 +204,7 @@ phases:
             rows:
               - name: Alice
                 email: alice@example.com
-                department_id: "@ref:dept_eng.id"   # Resolves to the generated ID
+                department_id: "@ref:dept_eng.id" # Resolves to the generated ID
 ```
 
 ### Environment Variable Substitution
@@ -226,10 +228,10 @@ Enable reconcile mode per seed set:
 ```yaml
 seed_sets:
   - name: departments
-    mode: reconcile        # "once" (default) or "reconcile"
+    mode: reconcile # "once" (default) or "reconcile"
     tables:
       - table: departments
-        unique_key: [name]  # Required for reconcile mode
+        unique_key: [name] # Required for reconcile mode
         rows:
           - name: Engineering
           - name: Sales

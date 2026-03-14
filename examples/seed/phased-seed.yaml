@@ -12,7 +12,6 @@
 #   export APP_SCHEMA=app_data
 #   initium seed --spec examples/seed/phased-seed.yaml
 
-
 database:
   driver: postgres
   url_env: DATABASE_URL
@@ -21,7 +20,7 @@ phases:
   # Phase 1: Create the schema if it doesn't exist
   - name: create_schema
     order: 1
-    schema: {{ env.APP_SCHEMA | default("app_data") }}
+    schema: { { env.APP_SCHEMA | default("app_data") } }
     create_if_missing: true
 
   # Phase 2: Wait for tables to be created by migrations, then seed

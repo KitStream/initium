@@ -237,7 +237,7 @@ No. Initium is designed for the most restrictive Kubernetes security posture:
 ```yaml
 securityContext:
   runAsNonRoot: true
-  runAsUser: 65534        # nobody
+  runAsUser: 65534 # nobody
   runAsGroup: 65534
   readOnlyRootFilesystem: true
   allowPrivilegeEscalation: false
@@ -275,7 +275,12 @@ To prevent man-in-the-middle attacks. If you connect to `https://vault:8200`, In
 If you need to connect to a service with a self-signed certificate (common in dev/staging), explicitly opt in:
 
 ```yaml
-args: ["wait-for", "--target", "https://vault:8200/v1/sys/health", "--insecure-tls"]
+args: [
+  "wait-for",
+  "--target",
+  "https://vault:8200/v1/sys/health",
+  "--insecure-tls",
+]
 ```
 
 The `--insecure-tls` flag is intentionally verbose — it should stand out in code review.
@@ -361,7 +366,15 @@ spec:
   initContainers:
     - name: render-config
       image: ghcr.io/kitstream/initium:latest
-      args: ["render", "--template", "/templates/app.conf.tmpl", "--output", "app.conf", "--workdir", "/work"]
+      args: [
+        "render",
+        "--template",
+        "/templates/app.conf.tmpl",
+        "--output",
+        "app.conf",
+        "--workdir",
+        "/work",
+      ]
       volumeMounts:
         - name: workdir
           mountPath: /work

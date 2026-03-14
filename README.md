@@ -214,7 +214,15 @@ Use the `render` subcommand with environment variable substitution:
 initContainers:
   - name: render-config
     image: ghcr.io/kitstream/initium:latest
-    args: ["render", "--template", "/templates/app.conf.tmpl", "--output", "app.conf", "--workdir", "/work"]
+    args: [
+      "render",
+      "--template",
+      "/templates/app.conf.tmpl",
+      "--output",
+      "app.conf",
+      "--workdir",
+      "/work",
+    ]
     env:
       - name: DB_HOST
         value: postgres
@@ -249,7 +257,12 @@ Output: `{"time":"2025-01-15T10:30:00Z","level":"INFO","msg":"target is reachabl
 Use `--insecure-tls` (must be explicitly opted in):
 
 ```yaml
-args: ["wait-for", "--target", "https://vault:8200/v1/sys/health", "--insecure-tls"]
+args: [
+  "wait-for",
+  "--target",
+  "https://vault:8200/v1/sys/health",
+  "--insecure-tls",
+]
 ```
 
 ### Can I use Initium outside Kubernetes?

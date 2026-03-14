@@ -107,4 +107,3 @@ spec:
       volumes:
         - name: workdir
           emptyDir: {}
-

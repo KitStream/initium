@@ -85,4 +85,3 @@ spec:
         - name: templates
           configMap:
             name: app-template
-

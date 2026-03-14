@@ -338,7 +338,17 @@ initContainers:
   - name: generate-key
     image: my-registry/initium-openssl:latest
     command: ["initium"]
-    args: ["exec", "--workdir", "/certs", "--", "openssl", "genrsa", "-out", "key.pem", "4096"]
+    args: [
+      "exec",
+      "--workdir",
+      "/certs",
+      "--",
+      "openssl",
+      "genrsa",
+      "-out",
+      "key.pem",
+      "4096",
+    ]
     volumeMounts:
       - name: certs
         mountPath: /certs
@@ -359,7 +369,13 @@ initContainers:
   - name: transform-config
     image: ghcr.io/kitstream/initium-jyq:latest
     command: ["initium"]
-    args: ["exec", "--", "jq", ".database.host = \"db.prod\"", "/config/app.json"]
+    args: [
+      "exec",
+      "--",
+      "jq",
+      ".database.host = \"db.prod\"",
+      "/config/app.json",
+    ]
 ```
 
 ## Global Flags
