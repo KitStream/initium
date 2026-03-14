@@ -16,7 +16,7 @@ jobs:
             echo "::error::RELEASE_TOKEN secret is not configured. Tags pushed with the default GITHUB_TOKEN cannot trigger the Release workflow."
             exit 1
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_TOKEN }}
