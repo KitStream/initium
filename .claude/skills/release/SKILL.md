@@ -40,7 +40,7 @@ Once confirmed:
    - Move everything under `## [Unreleased]` into a new `## [X.Y.Z] - YYYY-MM-DD` section (use today's date), placed immediately below `## [Unreleased]` (i.e., at the top of the released versions list).
    - Leave `## [Unreleased]` empty (with just the heading).
    - Each released version must have its own section with its changes — never merge entries across versions.
-5. Search all documentation files (`docs/`, `README.md`, `examples/`) for references to the previous version (e.g. image tags like `initium:1.3.1`, version strings) and update them to the new version. Exclude `CHANGELOG.md` (historical entries should keep their original versions).
+5. Search all documentation files (`docs/`, `README.md`, `examples/`) and the `Makefile` for references to the previous version (e.g. image tags like `initium:1.3.1`, version strings, cosign `--certificate-identity` tag refs in `docs/security.md`) and update them to the new version. Exclude `CHANGELOG.md` (historical entries should keep their original versions).
 6. Run `cargo test` to verify nothing is broken.
 7. Run `cargo clippy -- -D warnings` and `cargo fmt -- --check`.
 8. Commit all changed files (`Cargo.toml`, `Cargo.lock`, `CHANGELOG.md`, docs): `release: vX.Y.Z`
