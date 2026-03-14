@@ -11,8 +11,8 @@ Initium is a single Rust binary with multiple subcommands, each addressing a com
 ├─────────────────────────────────────────┤
 │               src/cmd/                  │
 │   ┌──────────┬──────────┬────────────┐  │
-│   │ wait-for │ migrate  │  render    │  │
-│   │ seed     │  fetch   │   exec     │  │
+│   │ wait-for │  render  │   fetch    │  │
+│   │ seed     │   exec   │            │  │
 │   └──────────┴──────────┴────────────┘  │
 ├─────────────────────────────────────────┤
 │          Shared Libraries               │
@@ -31,7 +31,6 @@ src/
   cmd/                Subcommand implementations (one file per command)
     mod.rs            Shared command execution helpers
     wait_for.rs       Wait for endpoints
-    migrate.rs        Database migrations
     seed.rs           Database seeding
     render.rs         Template rendering
     fetch.rs          HTTP fetch

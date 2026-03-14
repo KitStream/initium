@@ -2,7 +2,7 @@
 
 **Swiss-army toolbox for Kubernetes initContainers.**
 
-Initium replaces fragile bash scripts in your initContainers with a single, security-hardened, multi-tool binary. Wait for dependencies, run migrations, render config files, fetch secrets, and more — all with structured logging, retries, and safe defaults.
+Initium replaces fragile bash scripts in your initContainers with a single, security-hardened, multi-tool binary. Wait for dependencies, seed databases, render config files, fetch secrets, and more — all with structured logging, retries, and safe defaults.
 
 [![CI](https://github.com/kitstream/initium/actions/workflows/ci.yml/badge.svg)](https://github.com/kitstream/initium/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -66,7 +66,6 @@ kubectl apply -f https://raw.githubusercontent.com/kitstream/initium/main/exampl
 | Command    | Description                                                          | Status       |
 | ---------- | -------------------------------------------------------------------- | ------------ |
 | `wait-for` | Wait for TCP/HTTP/HTTPS endpoints                                    | ✅ Available |
-| `migrate`  | Run database migrations                                              | ✅ Available |
 | `seed`     | Structured database seeding from YAML/JSON with MiniJinja templating | ✅ Available |
 | `render`   | Render config templates                                              | ✅ Available |
 | `fetch`    | Fetch secrets/config from HTTP                                       | ✅ Available |
@@ -192,20 +191,6 @@ initContainers:
 
 See [docs/seeding.md](docs/seeding.md) for the full schema, features, and examples.
 
-### How do I run database migrations?
-
-Use the `migrate` subcommand — it wraps your migration tool with structured logging:
-
-```yaml
-initContainers:
-  - name: migrate
-    image: ghcr.io/kitstream/initium:latest
-    args: ["migrate", "--", "flyway", "migrate"]
-    env:
-      - name: FLYWAY_URL
-        value: "jdbc:postgresql://postgres:5432/mydb"
-```
-
 ### How do I render config templates?
 
 Use the `render` subcommand with environment variable substitution:
@@ -301,7 +286,7 @@ args:
 ## Examples
 
 - [**nginx-waitfor**](examples/nginx-waitfor/): Nginx deployment waiting for a backend service
-- [**postgres-migrate-seed**](examples/postgres-migrate-seed/): Wait → Migrate → Seed workflow
+- [**postgres-seed**](examples/postgres-seed/): Wait → Seed workflow with PostgreSQL
 - [**config-render**](examples/config-render/): Render config from templates before app starts
 
 ## How to Run Locally
@@ -351,7 +336,7 @@ Initium was built to address limitations in existing init container tools:
 | [k8s-wait-for](https://github.com/groundnuty/k8s-wait-for) | Bash     | Needs shell | No         | No               | Requires shell + kubectl |
 | [wait4x](https://github.com/atkrad/wait4x)                 | Go       | ~12 MB      | No         | No               | Minimal OS               |
 
-If you only need TCP/HTTP readiness checks, any of these tools work. Initium is designed for teams that also need migrations, seeding, config rendering, and secret fetching in a single security-hardened binary.
+If you only need TCP/HTTP readiness checks, any of these tools work. Initium is designed for teams that also need seeding, config rendering, and secret fetching in a single security-hardened binary.
 
 ## Documentation
 

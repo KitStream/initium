@@ -12,7 +12,7 @@ license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/KitStream/initium"
 rust-version = "1.88"
-description = "Swiss-army toolbox for Kubernetes initContainers — wait-for, migrate, seed, render, fetch in a single static Rust binary"
+description = "Swiss-army toolbox for Kubernetes initContainers — wait-for, seed, render, fetch in a single static Rust binary"
 
 [[bin]]
 name = "initium"

@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `dprint` formatter for Markdown, JSON, TOML, YAML, and Dockerfile with CI check (`dprint/check@v2.2`) and definition-of-done gate.
 - Structured database connection config as an alternative to URL (`host`, `port`, `user`, `password`, `name`, `options` fields). Passwords with URL-reserved characters (`@`, `%`, `:`, etc.) work without encoding. Connections are built using driver-native APIs (PostgreSQL key-value DSN, MySQL `OptsBuilder`), bypassing URL parsing entirely. The `url`/`url_env` fields remain supported for backward compatibility. See [#39](https://github.com/KitStream/initium/issues/39).
 
+### Removed
+
+- `migrate` subcommand: removed the thin command-execution wrapper. Use `exec` subcommand instead if you need to run an external migration tool with structured logging.
+
 ### Changed
 
 - Renamed `jyq.Dockerfile` to `Dockerfile.jyq` to follow the `Dockerfile.<variant>` convention.
@@ -73,8 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `exec` subcommand: run arbitrary commands with structured logging, exit code forwarding, and optional `--workdir` for child process working directory
 - `fetch` subcommand and `internal/fetch` package: fetch secrets/config from HTTP(S) endpoints with auth header via env var, retry with backoff, TLS options, redirect control (same-site by default), and path traversal prevention
 - `render` subcommand and `internal/render` package: render templates into config files with `envsubst` (default) and Jinja2 template modes, path traversal prevention, and automatic intermediate directory creation
-- `seed` subcommand: run database seed commands with structured logging and exit code forwarding (no idempotency — distinct from `migrate`)
-- `migrate` subcommand: run database migration commands with structured logging, exit code forwarding, and optional idempotency via `--lock-file`
+- `seed` subcommand: run database seed commands with structured logging and exit code forwarding
 - Structured database seeding via `seed` subcommand with YAML/JSON spec files
 - Seed tracking table (`initium_seed` by default) for idempotent seed application
 - Support for PostgreSQL, MySQL, and SQLite database drivers
@@ -112,7 +115,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation for building custom images using Initium as a base
 - SECURITY.md with vulnerability reporting instructions
 - Apache 2.0 LICENSE
-- Examples for nginx-waitfor, postgres-migrate-seed, config-render, template-functions, and phased-seed use cases
+- Examples for nginx-waitfor, postgres-seed, config-render, template-functions, and phased-seed use cases
 - Unit tests for retry logic, logging, safety path validation, wait-for, sha256, base64, template integration, seed schema parsing, database operations, executor logic, references, idempotency, reset, edge cases, duration parsing, and env var support
 - Integration tests with docker-compose for end-to-end testing against real Postgres 16, MySQL 8.0, and nginx services
 - Helm chart unit tests using helm-unittest plugin covering deployment rendering, securityContext, and configuration

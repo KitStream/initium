@@ -35,7 +35,7 @@ sampleDeployment:
 # Define initContainers that Initium should run.
 # Each entry becomes an initContainer in the sample deployment.
 #
-# Example: wait for Postgres, render config, then run migration
+# Example: wait for Postgres, then render config
 initContainers:
 # - name: wait-for-postgres
 #   command: ["wait-for"]
@@ -61,16 +61,6 @@ initContainers:
 #       value: postgres
 #     - name: DB_PORT
 #       value: "5432"
-
-# - name: run-migration
-#   command: ["migrate"]
-#   args:
-#     - --
-#     - /usr/bin/flyway
-#     - migrate
-#   env:
-#     - name: FLYWAY_URL
-#       value: jdbc:postgresql://postgres:5432/mydb
 
 # Additional volumes to mount into initContainers
 extraVolumes: []

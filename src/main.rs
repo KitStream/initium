@@ -18,7 +18,7 @@ use clap::{Parser, Subcommand};
     about = "Swiss-army toolbox for Kubernetes initContainers"
 )]
 #[command(
-    long_about = "Initium is a multi-tool CLI for Kubernetes initContainers.\nIt provides subcommands to wait for dependencies, run migrations,\nseed databases, render config templates, fetch secrets, and execute\narbitrary commands -- all with safe defaults, structured logging,\nand security guardrails."
+    long_about = "Initium is a multi-tool CLI for Kubernetes initContainers.\nIt provides subcommands to wait for dependencies,\nseed databases, render config templates, fetch secrets, and execute\narbitrary commands -- all with safe defaults, structured logging,\nand security guardrails."
 )]
 struct Cli {
     #[arg(
@@ -108,26 +108,6 @@ enum Commands {
             help = "Allow insecure TLS connections"
         )]
         insecure_tls: bool,
-    },
-
-    /// Run a database migration command with structured logging
-    Migrate {
-        #[arg(
-            long,
-            default_value = "/work",
-            env = "INITIUM_WORKDIR",
-            help = "Working directory"
-        )]
-        workdir: String,
-        #[arg(
-            long,
-            default_value = "",
-            env = "INITIUM_LOCK_FILE",
-            help = "Lock file for idempotency"
-        )]
-        lock_file: String,
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
     },
 
     /// Apply structured database seeds from a YAML/JSON spec file
@@ -320,11 +300,6 @@ fn main() {
                 .map_err(|e| format!("invalid retry config: {}", e))?;
             cmd::wait_for::run(&log, &target, &cfg, timeout_dur, http_status, insecure_tls)
         })(),
-        Commands::Migrate {
-            workdir,
-            lock_file,
-            args,
-        } => cmd::migrate::run(&log, &args, &workdir, &lock_file),
         Commands::Seed {
             spec,
             reset,

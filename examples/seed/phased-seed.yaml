@@ -23,7 +23,7 @@ phases:
     schema: { { env.APP_SCHEMA | default("app_data") } }
     create_if_missing: true
 
-  # Phase 2: Wait for tables to be created by migrations, then seed
+  # Phase 2: Wait for tables to exist, then seed
   - name: seed_departments
     order: 2
     timeout: 60s
