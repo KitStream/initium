@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-03-14
+
 ### Security
 
 - Cosign keyless image signing in release workflow for both `initium` and `initium-jyq` container images. Images are signed using Sigstore OIDC via GitHub Actions. SBOM attestations are also signed and attached to each image.
@@ -15,7 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `urlencode` template filter for percent-encoding strings in URLs. Useful for embedding passwords or other values containing URL-reserved characters (`@`, `%`, `:`, `/`, etc.) in connection strings.
-- `dprint` formatter for Markdown, JSON, TOML, YAML, and Dockerfile with CI check (`dprint/check@v2.2`) and definition-of-done gate.
 - Structured database connection config as an alternative to URL (`host`, `port`, `user`, `password`, `name`, `options` fields). Passwords with URL-reserved characters (`@`, `%`, `:`, etc.) work without encoding. Connections are built using driver-native APIs (PostgreSQL key-value DSN, MySQL `OptsBuilder`), bypassing URL parsing entirely. The `url`/`url_env` fields remain supported for backward compatibility. See [#39](https://github.com/KitStream/initium/issues/39).
 
 ### Removed
@@ -29,8 +30,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Reject unsupported `options` field in MySQL structured config — MySQL `OptsBuilder` does not support arbitrary connection options.
+
+### Chores
+
+- `dprint` formatter for Markdown, JSON, TOML, YAML, and Dockerfile with CI check (`dprint/check@v2.2`) and definition-of-done gate.
+- YAML plugin for `dprint` formatter.
 - Render tests now use an RAII `EnvGuard` to restore environment variables on drop, preventing cross-test interference when tests run in parallel.
+- `EnvGuard` now uses `OsString` for correctness and supports `remove()` constructor for unsetting variables.
+
+## [1.3.1] - 2026-03-12
+
+### Fixed
+
 - Auto Tag workflow now uses `RELEASE_TOKEN` instead of `GITHUB_TOKEN` so the pushed tag triggers the Release workflow. Tags pushed by the default `GITHUB_TOKEN` do not trigger other workflows (GitHub Actions security feature).
+- Added `RELEASE_TOKEN` preflight check to Auto Tag workflow and removed unused environment variable.
 
 ## [1.3.0] - 2026-03-12
 

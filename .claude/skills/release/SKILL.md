@@ -37,12 +37,14 @@ Once confirmed:
 2. Bump version in `Cargo.toml` (the `version = "..."` field under `[package]`).
 3. Run `cargo check` to ensure the project builds successfully after the version bump.
 4. Update `CHANGELOG.md`:
-   - Move everything under `## [Unreleased]` into a new `## [X.Y.Z] - YYYY-MM-DD` section (use today's date).
+   - Move everything under `## [Unreleased]` into a new `## [X.Y.Z] - YYYY-MM-DD` section (use today's date), placed immediately below `## [Unreleased]` (i.e., at the top of the released versions list).
    - Leave `## [Unreleased]` empty (with just the heading).
-5. Run `cargo test` to verify nothing is broken.
-6. Run `cargo clippy -- -D warnings` and `cargo fmt -- --check`.
-7. Commit: `release: vX.Y.Z`
-8. Push the branch and create a PR with title `release: vX.Y.Z`.
-9. The PR body should include the changelog entries for this version.
+   - Each released version must have its own section with its changes — never merge entries across versions.
+5. Search all documentation files (`docs/`, `README.md`, `examples/`) for references to the previous version (e.g. image tags like `initium:1.3.1`, version strings) and update them to the new version. Exclude `CHANGELOG.md` (historical entries should keep their original versions).
+6. Run `cargo test` to verify nothing is broken.
+7. Run `cargo clippy -- -D warnings` and `cargo fmt -- --check`.
+8. Commit: `release: vX.Y.Z`
+9. Push the branch and create a PR with title `release: vX.Y.Z`.
+10. The PR body should include the changelog entries for this version.
 
 When the PR merges, the auto-tag workflow detects the version bump in `Cargo.toml` and creates the `vX.Y.Z` tag, which triggers the release workflow (Docker build + crates.io publish).
