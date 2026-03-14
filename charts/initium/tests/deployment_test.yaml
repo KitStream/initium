@@ -100,16 +100,6 @@ tests:
           args:
             - --target
             - tcp://postgres:5432
-        - name: run-migration
-          command:
-            - migrate
-          args:
-            - --
-            - flyway
-            - migrate
-          env:
-            - name: FLYWAY_URL
-              value: "jdbc:postgresql://postgres:5432/mydb"
         - name: seed-data
           command:
             - seed
@@ -122,15 +112,9 @@ tests:
           value: wait-for-db
       - equal:
           path: spec.template.spec.initContainers[1].name
-          value: run-migration
-      - equal:
-          path: spec.template.spec.initContainers[1].env[0].name
-          value: FLYWAY_URL
-      - equal:
-          path: spec.template.spec.initContainers[2].name
           value: seed-data
       - equal:
-          path: spec.template.spec.initContainers[2].args
+          path: spec.template.spec.initContainers[1].args
           value:
             - --spec
             - /seeds/seed.yaml

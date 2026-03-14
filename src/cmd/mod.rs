@@ -1,14 +1,10 @@
 pub mod exec;
 pub mod fetch;
-pub mod migrate;
 pub mod render;
 pub mod wait_for;
 use crate::logging::Logger;
 use std::io::{BufRead, BufReader, Read};
 use std::process::Command;
-pub fn run_command(log: &Logger, args: &[String]) -> Result<i32, String> {
-    run_command_in_dir(log, args, None)
-}
 pub fn run_command_in_dir(log: &Logger, args: &[String], dir: Option<&str>) -> Result<i32, String> {
     let mut cmd = Command::new(&args[0]);
     cmd.args(&args[1..]);

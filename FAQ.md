@@ -7,7 +7,7 @@
 Initium is a single binary that replaces ad-hoc bash scripts in Kubernetes `initContainers`. Use it when your pod needs to do any of these before the main container starts:
 
 - Wait for a database or API to become reachable
-- Run database migrations or seed data
+- Seed data into a database
 - Render config files from templates
 - Fetch secrets or config from an HTTP endpoint
 - Run a setup script with structured logging
@@ -81,20 +81,6 @@ initContainers:
 ```
 
 Everything after `--` is the command Initium will execute. Initium does not interpret those arguments — it passes them directly via `execve`.
-
-### How do I run database migrations?
-
-Use the `migrate` subcommand. It works the same way as `seed` but is a separate subcommand so you can distinguish migration steps from seed steps in logs:
-
-```yaml
-initContainers:
-  - name: migrate
-    image: ghcr.io/kitstream/initium:latest
-    args: ["migrate", "--", "flyway", "migrate"]
-    env:
-      - name: FLYWAY_URL
-        value: "jdbc:postgresql://postgres:5432/mydb"
-```
 
 ### How do I render a config file from a template before my app starts?
 
@@ -209,11 +195,11 @@ docker run --rm --network mynet ghcr.io/kitstream/initium:latest \
 The `--` tells Initium where its own flags end and the wrapped command begins. Without it, Initium might try to interpret your tool's flags as its own:
 
 ```yaml
-# Correct — Initium sees "migrate" subcommand, then passes "flyway migrate" to execve
-args: ["migrate", "--", "flyway", "migrate"]
+# Correct — Initium sees "exec" subcommand, then passes "setup.sh" to execve
+args: ["exec", "--", "/bin/setup.sh"]
 
-# Wrong — Initium tries to parse "flyway" as a flag to the migrate subcommand
-args: ["migrate", "flyway", "migrate"]
+# Wrong — Initium tries to parse "/bin/setup.sh" as a flag to the exec subcommand
+args: ["exec", "/bin/setup.sh"]
 ```
 
 This is the same convention used by `kubectl`, `docker`, and many other CLI tools.
@@ -392,7 +378,7 @@ spec:
 
 The initContainer writes to `/work`, and the main container reads from it.
 
-### How do I chain multiple init steps (wait → migrate → seed)?
+### How do I chain multiple init steps (wait → seed)?
 
 Define multiple initContainers in order. Kubernetes runs them sequentially:
 
@@ -409,14 +395,9 @@ initContainers:
       capabilities:
         drop: [ALL]
 
-  - name: migrate
-    image: ghcr.io/kitstream/initium:latest
-    args: ["migrate", "--", "/app/migrate", "up"]
-    securityContext: *initium-security
-
   - name: seed
     image: ghcr.io/kitstream/initium:latest
-    args: ["seed", "--", "/app/seed", "--file", "/seeds/data.sql"]
+    args: ["seed", "--spec", "/seeds/seed.yaml"]
     securityContext: *initium-security
 ```
 
