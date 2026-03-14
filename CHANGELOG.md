@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-03-14
+
 ### Added
 
 - `database.default_database` field for structured config: specifies which database to connect to during `create_if_missing` bootstrap. Defaults to `postgres` for PostgreSQL; MySQL connects without selecting a database. Useful when the user does not have access to the default `postgres` database.
