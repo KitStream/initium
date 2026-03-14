@@ -674,6 +674,658 @@ fn test_seed_mysql_structured_config() {
 }
 
 // ---------------------------------------------------------------------------
+// seed: PostgreSQL — structured config with special-character password
+//
+// Passwords containing URL-reserved characters (@, :, /, ?, #, &, =, %)
+// must work when passed via structured config fields, without any URL
+// encoding from the user.
+// ---------------------------------------------------------------------------
+#[cfg(feature = "postgres")]
+#[test]
+fn test_seed_postgres_structured_special_password() {
+    if !integration_enabled() {
+        return;
+    }
+
+    let special_password = "p@ss:w0rd/h#sh?k=v&a=b%20";
+
+    let mut client = pg_client();
+
+    // Create a role with the special password and grant access.
+    // Use DROP .. IF EXISTS + CREATE, handling the case where the role owns
+    // objects from a prior test run by revoking first.
+    let role_exists: i64 = client
+        .query_one(
+            "SELECT COUNT(*) FROM pg_roles WHERE rolname = 'initium_special'",
+            &[],
+        )
+        .unwrap()
+        .get(0);
+    if role_exists > 0 {
+        client
+            .batch_execute(
+                "DROP OWNED BY initium_special;
+                 DROP ROLE initium_special",
+            )
+            .expect("failed to drop existing initium_special role");
+    }
+    client
+        .batch_execute(&format!(
+            "CREATE ROLE initium_special LOGIN PASSWORD '{}'",
+            special_password.replace('\'', "''")
+        ))
+        .expect("failed to create postgres role");
+    client
+        .batch_execute("GRANT ALL PRIVILEGES ON DATABASE initium_test TO initium_special")
+        .expect("failed to grant database access");
+
+    // Prepare tables and grant table-level permissions
+    client
+        .batch_execute(
+            "DROP TABLE IF EXISTS employees;
+             DROP TABLE IF EXISTS departments;
+             DROP TABLE IF EXISTS initium_seed;
+             CREATE TABLE departments (id SERIAL PRIMARY KEY, name TEXT UNIQUE);
+             CREATE TABLE employees (id SERIAL PRIMARY KEY, name TEXT, email TEXT UNIQUE, department_id INTEGER REFERENCES departments(id));
+             GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO initium_special;
+             GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO initium_special;
+             GRANT CREATE ON SCHEMA public TO initium_special;",
+        )
+        .expect("failed to create postgres tables");
+
+    // Write a spec with structured config using the special password
+    let workdir = tempfile::TempDir::new().expect("tempdir");
+    let spec_path = workdir.path().join("spec.yaml");
+    std::fs::write(
+        &spec_path,
+        format!(
+            r#"database:
+  driver: postgres
+  host: localhost
+  port: 15432
+  user: initium_special
+  password: "{password}"
+  name: initium_test
+  tracking_table: initium_seed
+
+phases:
+  - name: setup
+    order: 1
+    seed_sets:
+      - name: departments_special
+        order: 1
+        tables:
+          - table: departments
+            unique_key: [name]
+            auto_id:
+              column: id
+            rows:
+              - _ref: dept_eng
+                name: Engineering
+              - _ref: dept_sales
+                name: Sales
+
+      - name: employees_special
+        order: 2
+        tables:
+          - table: employees
+            unique_key: [email]
+            auto_id:
+              column: id
+            rows:
+              - name: Alice
+                email: alice@example.com
+                department_id: "@ref:dept_eng.id"
+              - name: Bob
+                email: bob@example.com
+                department_id: "@ref:dept_sales.id"
+"#,
+            password = special_password
+        ),
+    )
+    .expect("failed to write spec");
+
+    let out = Command::new(initium_bin())
+        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .output()
+        .expect("failed to run seed");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        out.status.success(),
+        "seed postgres with special-character password should succeed: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("seed execution completed"),
+        "expected completion log: {}",
+        stderr
+    );
+
+    let dept_count: i64 = client
+        .query_one("SELECT COUNT(*) FROM departments", &[])
+        .unwrap()
+        .get(0);
+    assert_eq!(dept_count, 2, "expected 2 departments");
+
+    let emp_count: i64 = client
+        .query_one("SELECT COUNT(*) FROM employees", &[])
+        .unwrap()
+        .get(0);
+    assert_eq!(emp_count, 2, "expected 2 employees");
+
+    let rows = client
+        .query(
+            "SELECT e.name, d.name FROM employees e JOIN departments d ON e.department_id = d.id ORDER BY e.name",
+            &[],
+        )
+        .unwrap();
+    assert_eq!(rows.len(), 2);
+    let alice_dept: &str = rows[0].get(1);
+    let bob_dept: &str = rows[1].get(1);
+    assert_eq!(alice_dept, "Engineering");
+    assert_eq!(bob_dept, "Sales");
+
+    // Cleanup: DROP OWNED removes all objects and privileges owned by the role,
+    // ensuring DROP ROLE succeeds even if the role created the tracking table.
+    client
+        .batch_execute(
+            "DROP OWNED BY initium_special;
+             DROP ROLE initium_special",
+        )
+        .expect("failed to clean up initium_special role");
+}
+
+// ---------------------------------------------------------------------------
+// seed: MySQL — structured config with special-character password
+// ---------------------------------------------------------------------------
+#[cfg(feature = "mysql")]
+#[test]
+fn test_seed_mysql_structured_special_password() {
+    if !integration_enabled() {
+        return;
+    }
+    use mysql::prelude::Queryable;
+
+    let special_password = "p@ss:w0rd/h#sh?k=v&a=b%20";
+
+    let mut root_conn = mysql_root_conn();
+
+    // Create user with the special password
+    let _ = root_conn.query_drop("DROP USER IF EXISTS 'initium_special'@'%'");
+    root_conn
+        .query_drop(format!(
+            "CREATE USER 'initium_special'@'%' IDENTIFIED BY '{}'",
+            special_password.replace('\'', "\\'")
+        ))
+        .expect("failed to create mysql user");
+    root_conn
+        .query_drop("GRANT ALL PRIVILEGES ON initium_test.* TO 'initium_special'@'%'")
+        .expect("failed to grant mysql privileges");
+    root_conn.query_drop("FLUSH PRIVILEGES").unwrap();
+
+    // Prepare tables using regular connection
+    let mut conn = mysql_conn();
+    conn.query_drop("DROP TABLE IF EXISTS orders").unwrap();
+    conn.query_drop("DROP TABLE IF EXISTS products").unwrap();
+    conn.query_drop("DROP TABLE IF EXISTS initium_seed")
+        .unwrap();
+    conn.query_drop(
+        "CREATE TABLE products (id INT AUTO_INCREMENT PRIMARY KEY, sku VARCHAR(255) UNIQUE, name VARCHAR(255), price VARCHAR(50))",
+    )
+    .unwrap();
+    conn.query_drop(
+        "CREATE TABLE orders (id INT AUTO_INCREMENT PRIMARY KEY, product_id INT, quantity VARCHAR(50), FOREIGN KEY (product_id) REFERENCES products(id))",
+    )
+    .unwrap();
+
+    // Write a spec with structured config using the special password
+    let workdir = tempfile::TempDir::new().expect("tempdir");
+    let spec_path = workdir.path().join("spec.yaml");
+    std::fs::write(
+        &spec_path,
+        format!(
+            r#"database:
+  driver: mysql
+  host: localhost
+  port: 13306
+  user: initium_special
+  password: "{password}"
+  name: initium_test
+  tracking_table: initium_seed
+
+phases:
+  - name: setup
+    order: 1
+    seed_sets:
+      - name: products_special
+        order: 1
+        tables:
+          - table: products
+            unique_key: [sku]
+            auto_id:
+              column: id
+            rows:
+              - _ref: prod_widget
+                sku: WIDGET-001
+                name: Widget
+                price: "9.99"
+              - _ref: prod_gadget
+                sku: GADGET-001
+                name: Gadget
+                price: "19.99"
+
+      - name: orders_special
+        order: 2
+        tables:
+          - table: orders
+            auto_id:
+              column: id
+            rows:
+              - product_id: "@ref:prod_widget.id"
+                quantity: "2"
+              - product_id: "@ref:prod_gadget.id"
+                quantity: "1"
+"#,
+            password = special_password
+        ),
+    )
+    .expect("failed to write spec");
+
+    let out = Command::new(initium_bin())
+        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .output()
+        .expect("failed to run seed");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        out.status.success(),
+        "seed mysql with special-character password should succeed: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("seed execution completed"),
+        "expected completion log: {}",
+        stderr
+    );
+
+    let prod_count: Option<i64> = conn
+        .exec_first("SELECT COUNT(*) FROM products", ())
+        .unwrap();
+    assert_eq!(prod_count, Some(2), "expected 2 products");
+
+    let order_count: Option<i64> = conn.exec_first("SELECT COUNT(*) FROM orders", ()).unwrap();
+    assert_eq!(order_count, Some(2), "expected 2 orders");
+
+    let rows: Vec<(String, String)> = conn
+        .exec(
+            "SELECT p.name, o.quantity FROM orders o JOIN products p ON o.product_id = p.id ORDER BY p.name",
+            (),
+        )
+        .unwrap();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].0, "Gadget");
+    assert_eq!(rows[0].1, "1");
+    assert_eq!(rows[1].0, "Widget");
+    assert_eq!(rows[1].1, "2");
+
+    // Cleanup
+    let _ = root_conn.query_drop("DROP USER IF EXISTS 'initium_special'@'%'");
+}
+
+// ---------------------------------------------------------------------------
+// seed: PostgreSQL — structured config with options (connect_timeout)
+// ---------------------------------------------------------------------------
+#[cfg(feature = "postgres")]
+#[test]
+fn test_seed_postgres_structured_options() {
+    if !integration_enabled() {
+        return;
+    }
+
+    let mut client = pg_client();
+    client
+        .batch_execute(
+            "DROP TABLE IF EXISTS employees;
+             DROP TABLE IF EXISTS departments;
+             DROP TABLE IF EXISTS initium_seed;
+             CREATE TABLE departments (id SERIAL PRIMARY KEY, name TEXT UNIQUE);
+             CREATE TABLE employees (id SERIAL PRIMARY KEY, name TEXT, email TEXT UNIQUE, department_id INTEGER REFERENCES departments(id));",
+        )
+        .expect("failed to create postgres tables");
+
+    // Write a spec with structured config including options
+    let workdir = tempfile::TempDir::new().expect("tempdir");
+    let spec_path = workdir.path().join("spec.yaml");
+    std::fs::write(
+        &spec_path,
+        r#"database:
+  driver: postgres
+  host: localhost
+  port: 15432
+  user: initium
+  password: initium
+  name: initium_test
+  tracking_table: initium_seed
+  options:
+    connect_timeout: "5"
+
+phases:
+  - name: setup
+    order: 1
+    seed_sets:
+      - name: departments_opts
+        order: 1
+        tables:
+          - table: departments
+            unique_key: [name]
+            auto_id:
+              column: id
+            rows:
+              - _ref: dept_eng
+                name: Engineering
+              - _ref: dept_sales
+                name: Sales
+
+      - name: employees_opts
+        order: 2
+        tables:
+          - table: employees
+            unique_key: [email]
+            auto_id:
+              column: id
+            rows:
+              - name: Alice
+                email: alice@example.com
+                department_id: "@ref:dept_eng.id"
+              - name: Bob
+                email: bob@example.com
+                department_id: "@ref:dept_sales.id"
+"#,
+    )
+    .expect("failed to write spec");
+
+    let out = Command::new(initium_bin())
+        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .output()
+        .expect("failed to run seed");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        out.status.success(),
+        "seed postgres with options should succeed: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("seed execution completed"),
+        "expected completion log: {}",
+        stderr
+    );
+
+    let dept_count: i64 = client
+        .query_one("SELECT COUNT(*) FROM departments", &[])
+        .unwrap()
+        .get(0);
+    assert_eq!(dept_count, 2, "expected 2 departments");
+
+    let emp_count: i64 = client
+        .query_one("SELECT COUNT(*) FROM employees", &[])
+        .unwrap()
+        .get(0);
+    assert_eq!(emp_count, 2, "expected 2 employees");
+}
+
+// ---------------------------------------------------------------------------
+// seed: PostgreSQL — structured config with create_if_missing for
+// non-existent database (issue #50)
+//
+// When using structured config with `name` pointing to a database that
+// does not exist yet, initium should connect to the default database first,
+// create the target, then reconnect. Currently this fails because the
+// initial connection includes the non-existent database name.
+// ---------------------------------------------------------------------------
+#[cfg(feature = "postgres")]
+#[test]
+fn test_seed_postgres_structured_create_nonexistent_db() {
+    if !integration_enabled() {
+        return;
+    }
+
+    let mut client = pg_client();
+    let _ = client.batch_execute("DROP DATABASE IF EXISTS initium_structured_newdb");
+
+    // Verify the database does NOT exist before seeding
+    let count: i64 = client
+        .query_one(
+            "SELECT COUNT(*) FROM pg_database WHERE datname = 'initium_structured_newdb'",
+            &[],
+        )
+        .unwrap()
+        .get(0);
+    assert_eq!(count, 0, "database should not exist before test");
+
+    // Write a spec with structured config where name = the non-existent database
+    let workdir = tempfile::TempDir::new().expect("tempdir");
+    let spec_path = workdir.path().join("spec.yaml");
+    std::fs::write(
+        &spec_path,
+        r#"database:
+  driver: postgres
+  host: localhost
+  port: 15432
+  user: initium
+  password: initium
+  name: initium_structured_newdb
+  tracking_table: initium_seed
+
+phases:
+  - name: create-database
+    order: 1
+    database: initium_structured_newdb
+    create_if_missing: true
+"#,
+    )
+    .expect("failed to write spec");
+
+    let out = Command::new(initium_bin())
+        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .output()
+        .expect("failed to run seed");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        out.status.success(),
+        "seed postgres structured create_if_missing should succeed: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("creating database if missing"),
+        "expected create database log: {}",
+        stderr
+    );
+
+    // Verify the database was created
+    let count: i64 = client
+        .query_one(
+            "SELECT COUNT(*) FROM pg_database WHERE datname = 'initium_structured_newdb'",
+            &[],
+        )
+        .unwrap()
+        .get(0);
+    assert_eq!(count, 1, "database should now exist");
+
+    // Idempotent re-run should also succeed
+    let out = Command::new(initium_bin())
+        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .output()
+        .expect("failed to re-run seed");
+    assert!(
+        out.status.success(),
+        "idempotent re-run should succeed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let _ = client.batch_execute("DROP DATABASE IF EXISTS initium_structured_newdb");
+}
+
+// ---------------------------------------------------------------------------
+// seed: PostgreSQL — structured config with create_if_missing using
+// custom default_database for bootstrap
+// ---------------------------------------------------------------------------
+#[cfg(feature = "postgres")]
+#[test]
+fn test_seed_postgres_structured_create_nonexistent_db_custom_default() {
+    if !integration_enabled() {
+        return;
+    }
+
+    let mut client = pg_client();
+    let _ = client.batch_execute("DROP DATABASE IF EXISTS initium_structured_newdb2");
+
+    let count: i64 = client
+        .query_one(
+            "SELECT COUNT(*) FROM pg_database WHERE datname = 'initium_structured_newdb2'",
+            &[],
+        )
+        .unwrap()
+        .get(0);
+    assert_eq!(count, 0, "database should not exist before test");
+
+    // Use initium_test as the bootstrap database instead of the default postgres
+    let workdir = tempfile::TempDir::new().expect("tempdir");
+    let spec_path = workdir.path().join("spec.yaml");
+    std::fs::write(
+        &spec_path,
+        r#"database:
+  driver: postgres
+  host: localhost
+  port: 15432
+  user: initium
+  password: initium
+  name: initium_structured_newdb2
+  default_database: initium_test
+  tracking_table: initium_seed
+
+phases:
+  - name: create-database
+    order: 1
+    database: initium_structured_newdb2
+    create_if_missing: true
+"#,
+    )
+    .expect("failed to write spec");
+
+    let out = Command::new(initium_bin())
+        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .output()
+        .expect("failed to run seed");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        out.status.success(),
+        "seed postgres with custom default_database should succeed: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("bootstrapping via default database"),
+        "expected bootstrap log: {}",
+        stderr
+    );
+
+    let count: i64 = client
+        .query_one(
+            "SELECT COUNT(*) FROM pg_database WHERE datname = 'initium_structured_newdb2'",
+            &[],
+        )
+        .unwrap()
+        .get(0);
+    assert_eq!(count, 1, "database should now exist");
+
+    let _ = client.batch_execute("DROP DATABASE IF EXISTS initium_structured_newdb2");
+}
+
+// ---------------------------------------------------------------------------
+// seed: MySQL — structured config with create_if_missing for
+// non-existent database (issue #50)
+// ---------------------------------------------------------------------------
+#[cfg(feature = "mysql")]
+#[test]
+fn test_seed_mysql_structured_create_nonexistent_db() {
+    if !integration_enabled() {
+        return;
+    }
+    use mysql::prelude::Queryable;
+
+    let mut root_conn = mysql_root_conn();
+    let _ = root_conn.query_drop("DROP DATABASE IF EXISTS initium_structured_newdb");
+
+    // Verify the database does NOT exist before seeding
+    let count: Option<i64> = root_conn
+        .exec_first(
+            "SELECT COUNT(*) FROM information_schema.schemata WHERE SCHEMA_NAME = 'initium_structured_newdb'",
+            (),
+        )
+        .unwrap();
+    assert_eq!(count, Some(0), "database should not exist before test");
+
+    // Write a spec with structured config where name = the non-existent database
+    let workdir = tempfile::TempDir::new().expect("tempdir");
+    let spec_path = workdir.path().join("spec.yaml");
+    std::fs::write(
+        &spec_path,
+        r#"database:
+  driver: mysql
+  host: localhost
+  port: 13306
+  user: root
+  password: rootpass
+  name: initium_structured_newdb
+  tracking_table: initium_seed
+
+phases:
+  - name: create-database
+    order: 1
+    database: initium_structured_newdb
+    create_if_missing: true
+"#,
+    )
+    .expect("failed to write spec");
+
+    let out = Command::new(initium_bin())
+        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .output()
+        .expect("failed to run seed");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        out.status.success(),
+        "seed mysql structured create_if_missing should succeed: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("creating database if missing"),
+        "expected create database log: {}",
+        stderr
+    );
+
+    // Verify the database was created
+    let count: Option<i64> = root_conn
+        .exec_first(
+            "SELECT COUNT(*) FROM information_schema.schemata WHERE SCHEMA_NAME = 'initium_structured_newdb'",
+            (),
+        )
+        .unwrap();
+    assert_eq!(count, Some(1), "database should now exist");
+
+    // Idempotent re-run should also succeed
+    let out = Command::new(initium_bin())
+        .args(["seed", "--spec", spec_path.to_str().unwrap()])
+        .output()
+        .expect("failed to re-run seed");
+    assert!(
+        out.status.success(),
+        "idempotent re-run should succeed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let _ = root_conn.query_drop("DROP DATABASE IF EXISTS initium_structured_newdb");
+}
+
+// ---------------------------------------------------------------------------
 // seed: PostgreSQL — create database via seed phase
 // ---------------------------------------------------------------------------
 #[cfg(feature = "postgres")]

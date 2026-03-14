@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `database.default_database` field for structured config: specifies which database to connect to during `create_if_missing` bootstrap. Defaults to `postgres` for PostgreSQL; MySQL connects without selecting a database. Useful when the user does not have access to the default `postgres` database.
+
+### Fixed
+
+- Structured database config now works with `create_if_missing: true` when the target database does not yet exist. Previously, the initial connection included the non-existent database name, causing an immediate connection error. Now initium connects to a bootstrap database first, creates the target, then reconnects. Fixes [#50](https://github.com/KitStream/initium/issues/50).
+
+### Chores
+
+- Added integration tests for structured database connectivity: special-character passwords (URL-reserved chars like `@`, `:`, `/`, `?`, `#`, `%`), PostgreSQL `options` field (`connect_timeout`), and `create_if_missing` with non-existent database ([#50](https://github.com/KitStream/initium/issues/50)).
+
 ## [2.0.1] - 2026-03-14
 
 ### Fixed

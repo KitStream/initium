@@ -92,6 +92,8 @@ pub struct DatabaseConfig {
     #[serde(default)]
     pub name: String,
     #[serde(default)]
+    pub default_database: String,
+    #[serde(default)]
     pub options: HashMap<String, String>,
     #[serde(default = "default_tracking_table")]
     pub tracking_table: String,
@@ -527,6 +529,47 @@ phases:
         let plan = SeedPlan::from_yaml(yaml).unwrap();
         assert!(plan.database.has_structured_config());
         assert_eq!(plan.database.port, None);
+    }
+
+    #[test]
+    fn test_structured_config_default_database() {
+        let yaml = r#"
+database:
+  driver: postgres
+  host: pg.example.com
+  user: app
+  name: mydb
+  default_database: maintenance_db
+phases:
+  - name: phase1
+    seed_sets:
+      - name: x
+        tables:
+          - table: t
+            rows: []
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        assert_eq!(plan.database.default_database, "maintenance_db");
+    }
+
+    #[test]
+    fn test_structured_config_default_database_empty_by_default() {
+        let yaml = r#"
+database:
+  driver: postgres
+  host: localhost
+  user: app
+  name: mydb
+phases:
+  - name: phase1
+    seed_sets:
+      - name: x
+        tables:
+          - table: t
+            rows: []
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        assert!(plan.database.default_database.is_empty());
     }
 
     #[test]
