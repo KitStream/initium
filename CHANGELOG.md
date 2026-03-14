@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `urlencode` template filter for percent-encoding strings in URLs. Useful for embedding passwords or other values containing URL-reserved characters (`@`, `%`, `:`, `/`, etc.) in connection strings.
 - `dprint` formatter for Markdown, JSON, TOML, YAML, and Dockerfile with CI check (`dprint/check@v2.2`) and definition-of-done gate.
+- Structured database connection config as an alternative to URL (`host`, `port`, `user`, `password`, `name`, `options` fields). Passwords with URL-reserved characters (`@`, `%`, `:`, etc.) work without encoding. Connections are built using driver-native APIs (PostgreSQL key-value DSN, MySQL `OptsBuilder`), bypassing URL parsing entirely. The `url`/`url_env` fields remain supported for backward compatibility. See [#39](https://github.com/KitStream/initium/issues/39).
 
 ### Changed
 

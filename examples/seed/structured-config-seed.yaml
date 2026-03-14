@@ -1,0 +1,31 @@
+# Structured database connection config — no URL encoding needed.
+#
+# Passwords with special characters (@, %, :, etc.) just work.
+# Initium builds the connection using driver-native APIs.
+#
+# Usage:
+#   export DB_PASSWORD='p@ss:word/with%special&chars'
+#   initium seed --spec examples/seed/structured-config-seed.yaml
+
+database:
+  driver: postgres
+  host: pg.example.com
+  port: 5432
+  user: app_user
+  password: "{{ env.DB_PASSWORD }}"
+  name: myapp
+  options:
+    sslmode: disable
+
+phases:
+  - name: setup
+    seed_sets:
+      - name: config
+        tables:
+          - table: config
+            unique_key: [key]
+            rows:
+              - key: app_name
+                value: MyApp
+              - key: version
+                value: "1.0.0"

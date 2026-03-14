@@ -81,8 +81,39 @@ pub struct DatabaseConfig {
     pub url_env: String,
     #[serde(default)]
     pub url: String,
+    #[serde(default)]
+    pub host: String,
+    #[serde(default)]
+    pub port: Option<u16>,
+    #[serde(default)]
+    pub user: String,
+    #[serde(default)]
+    pub password: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub options: HashMap<String, String>,
     #[serde(default = "default_tracking_table")]
     pub tracking_table: String,
+}
+
+impl DatabaseConfig {
+    pub fn has_structured_config(&self) -> bool {
+        !self.host.is_empty()
+    }
+
+    fn has_url_config(&self) -> bool {
+        !self.url.is_empty() || !self.url_env.is_empty()
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.has_structured_config() && self.has_url_config() {
+            return Err(
+                "database config must use either structured fields (host, port, user, password, name) or url/url_env, not both".into(),
+            );
+        }
+        Ok(())
+    }
 }
 
 fn default_driver() -> String {
@@ -191,6 +222,7 @@ impl SeedPlan {
     }
 
     pub fn validate(&self) -> Result<(), String> {
+        self.database.validate()?;
         if self.phases.is_empty() {
             return Err("seed plan must contain at least one phase".into());
         }
@@ -304,22 +336,6 @@ impl SeedPlan {
         }
         Ok(())
     }
-
-    pub fn resolve_db_url(&self) -> Result<String, String> {
-        if !self.database.url_env.is_empty() {
-            std::env::var(&self.database.url_env).map_err(|_| {
-                format!(
-                    "environment variable '{}' not set for database URL",
-                    self.database.url_env
-                )
-            })
-        } else if !self.database.url.is_empty() {
-            Ok(self.database.url.clone())
-        } else {
-            std::env::var("DATABASE_URL")
-                .map_err(|_| "no database URL configured: set database.url, database.url_env, or DATABASE_URL env var".into())
-        }
-    }
 }
 
 #[cfg(test)]
@@ -425,7 +441,7 @@ phases:
     }
 
     #[test]
-    fn test_resolve_url_from_config() {
+    fn test_url_config() {
         let yaml = r#"
 database:
   driver: sqlite
@@ -439,12 +455,12 @@ phases:
             rows: []
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        assert_eq!(plan.resolve_db_url().unwrap(), "test.db");
+        assert_eq!(plan.database.url, "test.db");
+        assert!(!plan.database.has_structured_config());
     }
 
     #[test]
-    fn test_resolve_url_from_env() {
-        std::env::set_var("TEST_SEED_DB_URL", "postgres://localhost/test");
+    fn test_url_env_config() {
         let yaml = r#"
 database:
   driver: postgres
@@ -458,8 +474,97 @@ phases:
             rows: []
 "#;
         let plan = SeedPlan::from_yaml(yaml).unwrap();
-        assert_eq!(plan.resolve_db_url().unwrap(), "postgres://localhost/test");
-        std::env::remove_var("TEST_SEED_DB_URL");
+        assert_eq!(plan.database.url_env, "TEST_SEED_DB_URL");
+        assert!(!plan.database.has_structured_config());
+    }
+
+    #[test]
+    fn test_structured_config() {
+        let yaml = r#"
+database:
+  driver: postgres
+  host: pg.example.com
+  port: 5432
+  user: netbird
+  password: "s3cret!"
+  name: mydb
+  options:
+    sslmode: disable
+phases:
+  - name: phase1
+    seed_sets:
+      - name: x
+        tables:
+          - table: t
+            rows: []
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        assert!(plan.database.has_structured_config());
+        assert_eq!(plan.database.host, "pg.example.com");
+        assert_eq!(plan.database.port, Some(5432));
+        assert_eq!(plan.database.user, "netbird");
+        assert_eq!(plan.database.password, "s3cret!");
+        assert_eq!(plan.database.name, "mydb");
+        assert_eq!(plan.database.options.get("sslmode").unwrap(), "disable");
+    }
+
+    #[test]
+    fn test_structured_config_default_port() {
+        let yaml = r#"
+database:
+  driver: postgres
+  host: localhost
+  user: app
+  name: mydb
+phases:
+  - name: phase1
+    seed_sets:
+      - name: x
+        tables:
+          - table: t
+            rows: []
+"#;
+        let plan = SeedPlan::from_yaml(yaml).unwrap();
+        assert!(plan.database.has_structured_config());
+        assert_eq!(plan.database.port, None);
+    }
+
+    #[test]
+    fn test_rejects_url_and_structured_config() {
+        let yaml = r#"
+database:
+  driver: postgres
+  url: "postgres://localhost/db"
+  host: localhost
+phases:
+  - name: phase1
+    seed_sets:
+      - name: x
+        tables:
+          - table: t
+            rows: []
+"#;
+        let err = SeedPlan::from_yaml(yaml).unwrap_err();
+        assert!(err.contains("not both"));
+    }
+
+    #[test]
+    fn test_rejects_url_env_and_structured_config() {
+        let yaml = r#"
+database:
+  driver: postgres
+  url_env: DATABASE_URL
+  host: localhost
+phases:
+  - name: phase1
+    seed_sets:
+      - name: x
+        tables:
+          - table: t
+            rows: []
+"#;
+        let err = SeedPlan::from_yaml(yaml).unwrap_err();
+        assert!(err.contains("not both"));
     }
 
     #[test]

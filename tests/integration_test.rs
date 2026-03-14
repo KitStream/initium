@@ -546,6 +546,134 @@ fn test_seed_mysql() {
 }
 
 // ---------------------------------------------------------------------------
+// seed: PostgreSQL — structured config (no URL, discrete fields)
+// ---------------------------------------------------------------------------
+#[cfg(feature = "postgres")]
+#[test]
+fn test_seed_postgres_structured_config() {
+    if !integration_enabled() {
+        return;
+    }
+
+    let mut client = pg_client();
+    client
+        .batch_execute(
+            "DROP TABLE IF EXISTS employees;
+             DROP TABLE IF EXISTS departments;
+             DROP TABLE IF EXISTS initium_seed;
+             CREATE TABLE departments (id SERIAL PRIMARY KEY, name TEXT UNIQUE);
+             CREATE TABLE employees (id SERIAL PRIMARY KEY, name TEXT, email TEXT UNIQUE, department_id INTEGER REFERENCES departments(id));",
+        )
+        .expect("failed to create postgres tables");
+
+    let spec = format!("{}/seed-postgres-structured.yaml", input_dir());
+    let out = Command::new(initium_bin())
+        .args(["seed", "--spec", &spec])
+        .output()
+        .expect("failed to run seed");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        out.status.success(),
+        "seed postgres structured config should succeed: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("seed execution completed"),
+        "expected completion log: {}",
+        stderr
+    );
+
+    let dept_count: i64 = client
+        .query_one("SELECT COUNT(*) FROM departments", &[])
+        .unwrap()
+        .get(0);
+    assert_eq!(dept_count, 2, "expected 2 departments");
+
+    let emp_count: i64 = client
+        .query_one("SELECT COUNT(*) FROM employees", &[])
+        .unwrap()
+        .get(0);
+    assert_eq!(emp_count, 2, "expected 2 employees");
+
+    // Verify cross-table references work with structured config
+    let rows = client
+        .query(
+            "SELECT e.name, d.name FROM employees e JOIN departments d ON e.department_id = d.id ORDER BY e.name",
+            &[],
+        )
+        .unwrap();
+    assert_eq!(rows.len(), 2);
+    let alice_dept: &str = rows[0].get(1);
+    let bob_dept: &str = rows[1].get(1);
+    assert_eq!(alice_dept, "Engineering");
+    assert_eq!(bob_dept, "Sales");
+}
+
+// ---------------------------------------------------------------------------
+// seed: MySQL — structured config (no URL, discrete fields)
+// ---------------------------------------------------------------------------
+#[cfg(feature = "mysql")]
+#[test]
+fn test_seed_mysql_structured_config() {
+    if !integration_enabled() {
+        return;
+    }
+    use mysql::prelude::Queryable;
+
+    let mut conn = mysql_conn();
+    conn.query_drop("DROP TABLE IF EXISTS orders").unwrap();
+    conn.query_drop("DROP TABLE IF EXISTS products").unwrap();
+    conn.query_drop("DROP TABLE IF EXISTS initium_seed")
+        .unwrap();
+    conn.query_drop(
+        "CREATE TABLE products (id INT AUTO_INCREMENT PRIMARY KEY, sku VARCHAR(255) UNIQUE, name VARCHAR(255), price VARCHAR(50))",
+    )
+    .unwrap();
+    conn.query_drop(
+        "CREATE TABLE orders (id INT AUTO_INCREMENT PRIMARY KEY, product_id INT, quantity VARCHAR(50), FOREIGN KEY (product_id) REFERENCES products(id))",
+    )
+    .unwrap();
+
+    let spec = format!("{}/seed-mysql-structured.yaml", input_dir());
+    let out = Command::new(initium_bin())
+        .args(["seed", "--spec", &spec])
+        .output()
+        .expect("failed to run seed");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        out.status.success(),
+        "seed mysql structured config should succeed: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("seed execution completed"),
+        "expected completion log: {}",
+        stderr
+    );
+
+    let prod_count: Option<i64> = conn
+        .exec_first("SELECT COUNT(*) FROM products", ())
+        .unwrap();
+    assert_eq!(prod_count, Some(2), "expected 2 products");
+
+    let order_count: Option<i64> = conn.exec_first("SELECT COUNT(*) FROM orders", ()).unwrap();
+    assert_eq!(order_count, Some(2), "expected 2 orders");
+
+    // Verify cross-table references work with structured config
+    let rows: Vec<(String, String)> = conn
+        .exec(
+            "SELECT p.name, o.quantity FROM orders o JOIN products p ON o.product_id = p.id ORDER BY p.name",
+            (),
+        )
+        .unwrap();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].0, "Gadget");
+    assert_eq!(rows[0].1, "1");
+    assert_eq!(rows[1].0, "Widget");
+    assert_eq!(rows[1].1, "2");
+}
+
+// ---------------------------------------------------------------------------
 // seed: PostgreSQL — create database via seed phase
 // ---------------------------------------------------------------------------
 #[cfg(feature = "postgres")]
