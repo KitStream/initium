@@ -7,28 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `urlencode` template filter for percent-encoding strings in URLs. Useful for embedding passwords or other values containing URL-reserved characters (`@`, `%`, `:`, `/`, etc.) in connection strings.
+- `dprint` formatter for Markdown, JSON, TOML, and Dockerfile with CI check (`dprint/check@v2.2`) and definition-of-done gate.
+
 ### Changed
+
+- Renamed `jyq.Dockerfile` to `Dockerfile.jyq` to follow the `Dockerfile.<variant>` convention.
 - Docker dependency cache now survives version-only bumps by normalizing the root package version in a preparatory build stage.
 
 ### Fixed
+
 - Auto Tag workflow now uses `RELEASE_TOKEN` instead of `GITHUB_TOKEN` so the pushed tag triggers the Release workflow. Tags pushed by the default `GITHUB_TOKEN` do not trigger other workflows (GitHub Actions security feature).
 
 ## [1.3.0] - 2026-03-12
 
 ### Added
+
 - Auto-tag workflow: CI automatically creates a git tag when `Cargo.toml` version changes on main, triggering the release workflow.
 - `/release` skill for Claude Code: guided release preparation with version determination, confirmation, and PR creation.
 - `ignore_columns` option for reconcile mode tables: columns listed in `ignore_columns` are included in the initial INSERT but excluded from change detection, UPDATE statements, and content hash computation. Useful for timestamps, tokens, or values managed by database triggers.
 
 ### Changed
+
 - Moved `/release` from Claude Code command to skill (directory-based `SKILL.md` format).
 
 ### Fixed
+
 - Replaced Dockerfile `--mount=type=cache` with dependency layer caching ("empty main" trick) for reliable Docker build caching in GitHub Actions, where `--mount=type=cache` does not persist across runners.
 
 ## [1.2.0] - 2026-03-11
 
 ### Added
+
 - Reconcile mode for seed sets (`mode: reconcile`): declarative seeding where the spec is the source of truth. Changed rows are updated, new rows are inserted, and removed rows are deleted automatically.
 - `--reconcile-all` CLI flag to override all seed sets to reconcile mode for a single run.
 - `--dry-run` CLI flag to preview what changes reconciliation would make without modifying the database.
@@ -38,11 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI summary job (`ci`) for branch ruleset status check compatibility.
 
 ### Changed
+
 - Reconcile hash-skip now only applies to seed sets without `@ref:` expressions. Seed sets containing `@ref:` references always run row-level reconciliation to prevent stale foreign keys when upstream auto-generated IDs shift.
 - Hash computation sorts tables by `(order, table_name)` instead of just `order` for deterministic hashing when multiple tables share the same order value.
 - Dry-run mode treats `@ref:` expressions as literals to avoid failures when references haven't been populated yet (e.g., auto_id + refs within the same seed set).
 
 ### Fixed
+
 - `--reconcile-all` now rejects seed sets where any table is missing `unique_key`, preventing reconciliation from generating identical row keys and updating/deleting wrong rows.
 - Reconcile mode validation now rejects empty/whitespace-only `unique_key` entries and reserved column names like `_ref`.
 - Reconcile mode validation now checks that every row contains all `unique_key` columns, preventing incomplete row keys during reconciliation.
@@ -51,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0] - 2026-02-26
 
 ### Added
+
 - Project scaffolding with Rust/Cargo, CLI framework (clap), and repo layout
 - `wait-for` subcommand: wait for TCP and HTTP(S) endpoints with retries, exponential backoff, and jitter
 - `exec` subcommand: run arbitrary commands with structured logging, exit code forwarding, and optional `--workdir` for child process working directory
@@ -102,6 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Separate GitHub Actions workflow for integration tests with service containers
 
 ### Changed
+
 - Complete rewrite from Go to Rust for smaller Docker images (7.4MB → ~5MB)
 - CLI framework changed from cobra to clap
 - Template engine changed from Go text/template to minijinja (Jinja2-style); access env vars via `{{ env.VAR }}`
@@ -120,6 +136,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release workflow now publishes to crates.io automatically on tag push (requires `CARGO_REGISTRY_TOKEN` secret)
 
 ### Fixed
+
 - Updated Dockerfiles (`Dockerfile`, `jyq.Dockerfile`) from `rust:1.85-alpine` to `rust:1.88-alpine` to fix release workflow failure caused by `time@0.3.47` requiring rustc 1.88.0
 - Aligned all markdown table columns across documentation files
 - Fixed clippy `collapsible_if` lint in seed executor's unique key check
@@ -131,10 +148,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced Dockerfile stub-build caching layer with BuildKit `--mount=type=cache` for cargo registry and target directory, enabling cross-build cache reuse
 
 ### Removed
+
 - Seed schema version 1 (flat `seed_sets` without phases): all seed specs now use phase-based structure
 - `version` field from seed spec schema: no longer required or accepted
 
 ### Security
+
 - All file operations constrained to --workdir with path traversal prevention
 - Automatic redaction of sensitive keys (token, password, secret, etc.) in logs
 - Container runs as non-root with read-only root filesystem and all capabilities dropped

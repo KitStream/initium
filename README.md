@@ -63,8 +63,8 @@ kubectl apply -f https://raw.githubusercontent.com/kitstream/initium/main/exampl
 
 ## Subcommands
 
-| Command    | Description                                                          | Status      |
-| ---------- | -------------------------------------------------------------------- | ----------- |
+| Command    | Description                                                          | Status       |
+| ---------- | -------------------------------------------------------------------- | ------------ |
 | `wait-for` | Wait for TCP/HTTP/HTTPS endpoints                                    | ✅ Available |
 | `migrate`  | Run database migrations                                              | ✅ Available |
 | `seed`     | Structured database seeding from YAML/JSON with MiniJinja templating | ✅ Available |
@@ -108,9 +108,9 @@ cargo build --release --no-default-features --features sqlite
 
 | Feature    | Default | Description          |
 | ---------- | ------- | -------------------- |
-| `sqlite`   | ✅       | SQLite driver        |
-| `postgres` | ✅       | PostgreSQL driver    |
-| `mysql`    | ✅       | MySQL/MariaDB driver |
+| `sqlite`   | ✅      | SQLite driver        |
+| `postgres` | ✅      | PostgreSQL driver    |
+| `mysql`    | ✅      | MySQL/MariaDB driver |
 
 ## Helm Chart
 
@@ -354,4 +354,3 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for build inst
 ## License
 
 [Apache License 2.0](LICENSE)
-

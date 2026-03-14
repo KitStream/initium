@@ -137,4 +137,3 @@ The `internal/safety` package enforces:
 - **Path validation**: All file writes must target paths within `--workdir`
 - **Absolute path rejection**: Target paths must be relative
 - **Traversal detection**: `..` sequences that escape workdir are rejected
-

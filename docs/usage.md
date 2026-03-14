@@ -418,4 +418,3 @@ All subcommands apply these security defaults:
 - TLS verification enabled by default
 
 See [security.md](security.md) for the full threat model.
-

@@ -135,6 +135,12 @@ mod tests {
         assert_eq!(template_render("").unwrap(), "");
     }
     #[test]
+    fn test_template_urlencode() {
+        env::set_var("TEST_URLENCODE_VAR", "p@ss%word");
+        let result = template_render("{{ env.TEST_URLENCODE_VAR | urlencode }}").unwrap();
+        assert_eq!(result, "p%40ss%25word");
+    }
+    #[test]
     fn test_template_invalid() {
         let result = template_render("{{ invalid %}");
         assert!(result.is_err());

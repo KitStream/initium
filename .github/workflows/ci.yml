@@ -17,6 +17,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --check
       - run: cargo clippy -- -D warnings
+  dprint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dprint/check@v2.2
   test:
     runs-on: ubuntu-latest
     steps:
@@ -47,7 +52,7 @@ jobs:
       - run: helm unittest charts/initium
   ci:
     if: always()
-    needs: [lint, test, build, helm-lint]
+    needs: [lint, test, build, helm-lint, dprint]
     runs-on: ubuntu-latest
     steps:
       - run: |

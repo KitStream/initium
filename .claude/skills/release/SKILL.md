@@ -23,6 +23,7 @@ Follow semantic versioning (MAJOR.MINOR.PATCH):
 ## Confirmation phase
 
 Before making any changes, present to the user:
+
 - The **current version** and the **proposed next version** with reasoning.
 - A **summary of changes** that will go into the release (from Unreleased changelog + commit log).
 - Ask: "Proceed with version X.Y.Z?" and wait for confirmation.
