@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Release workflow: `cargo publish` failed when `Cargo.lock` was stale. Added an explicit `cargo update --workspace` step before publish to ensure lockfile consistency.
+
 ## [2.1.0] - 2026-03-14
 
 ### Added
