@@ -1,6 +1,5 @@
 target/
 .git/
-bin/
 *.md
 !README.md
 docs/

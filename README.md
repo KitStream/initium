@@ -345,6 +345,37 @@ If you only need TCP/HTTP readiness checks, any of these tools work. Initium is 
 - [Security](docs/security.md) — Threat model, safe defaults, PSA compatibility
 - [Architecture & Design](docs/design.md) — How Initium works and how to extend it
 
+## Development
+
+### Prerequisites
+
+- [Rust toolchain](https://rustup.rs/) with musl targets:
+  ```bash
+  rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl
+  ```
+- [Zig](https://ziglang.org/) for cross-compilation: `brew install zig`
+- [cargo-zigbuild](https://github.com/rust-cross/cargo-zigbuild): `cargo install cargo-zigbuild`
+- (Optional) [sccache](https://github.com/mozilla/sccache) for build caching across worktrees:
+  ```bash
+  brew install sccache
+  export RUSTC_WRAPPER=sccache
+  ```
+
+### Cross-compile for linux/amd64 and linux/arm64
+
+```bash
+make cross-build
+file bin/initium-amd64 bin/initium-arm64
+```
+
+### Build and push multi-arch Docker images
+
+```bash
+make docker-multiarch VERSION=dev IMAGE=ghcr.io/kitstream/initium
+```
+
+This runs `cross-build` then uses `docker buildx` to assemble and push multi-arch images for both `initium` (scratch) and `initium-jyq` (alpine + jq/yq).
+
 ## Contributing
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions, test commands, and PR expectations. See the [design doc](docs/design.md) for how to add new subcommands.

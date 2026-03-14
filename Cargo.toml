@@ -28,7 +28,7 @@ mysql = ["dep:mysql"]
 base64 = "0.22"
 clap = { version = "4", features = ["derive", "env"] }
 minijinja = { version = "2", features = ["urlencode"] }
-mysql = { version = "25", optional = true }
+mysql = { version = "25", optional = true, default-features = false, features = ["minimal-rust", "rustls-tls", "buffer-pool"] }
 postgres = { version = "0.19", optional = true }
 rand = "0.8"
 rusqlite = { version = "0.31", features = ["bundled"], optional = true }
