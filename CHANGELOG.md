@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- SBOM attestation in release workflow: use platform-specific SBOM path (`index .SBOM "linux/amd64"`) instead of `.SBOM.SPDX` which returns `null` for multi-platform images.
+- Cosign verification commands in docs and Makefile: use `--certificate-identity` with the exact tag ref (e.g. `@refs/tags/v2.0.0`) instead of a glob pattern (`v*`) which cosign does not support.
+
 ## [2.0.0] - 2026-03-14
 
 ### Security

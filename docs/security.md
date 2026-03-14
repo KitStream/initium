@@ -86,7 +86,7 @@ Release images are signed with [cosign](https://github.com/sigstore/cosign) usin
 # Verify signature (requires cosign)
 cosign verify \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity 'https://github.com/KitStream/initium/.github/workflows/release.yml@refs/tags/v*' \
+  --certificate-identity 'https://github.com/KitStream/initium/.github/workflows/release.yml@refs/tags/v2.0.0' \
   ghcr.io/kitstream/initium:2.0.0
 
 # Or use the Makefile target (also supports IMAGE=ghcr.io/kitstream/initium-jyq)
@@ -99,7 +99,7 @@ make verify-image VERSION=2.0.0
 cosign verify-attestation \
   --type spdx \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity 'https://github.com/KitStream/initium/.github/workflows/release.yml@refs/tags/v*' \
+  --certificate-identity 'https://github.com/KitStream/initium/.github/workflows/release.yml@refs/tags/v2.0.0' \
   ghcr.io/kitstream/initium:2.0.0
 ```
 
