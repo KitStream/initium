@@ -39,6 +39,7 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
+        id: build-main
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -53,13 +54,14 @@ jobs:
           sbom: true
           provenance: true
       - name: Sign initium image
-        run: |
-          cosign sign --yes ghcr.io/kitstream/initium:${{ steps.version.outputs.VERSION }}
-          cosign sign --yes ghcr.io/kitstream/initium:latest
+        run: cosign sign --yes ghcr.io/kitstream/initium@${{ steps.build-main.outputs.digest }}
       - name: SBOM attestation for initium image
         run: |
-          cosign attest --yes --predicate <(docker buildx imagetools inspect ghcr.io/kitstream/initium:${{ steps.version.outputs.VERSION }} --format '{{json .SBOM.SPDX}}') --type spdx ghcr.io/kitstream/initium:${{ steps.version.outputs.VERSION }}
+          cosign attest --yes --type spdx \
+            --predicate <(docker buildx imagetools inspect ghcr.io/kitstream/initium@${{ steps.build-main.outputs.digest }} --format '{{json .SBOM.SPDX}}') \
+            ghcr.io/kitstream/initium@${{ steps.build-main.outputs.digest }}
       - uses: docker/build-push-action@v6
+        id: build-jyq
         with:
           context: .
           file: Dockerfile.jyq
@@ -75,9 +77,9 @@ jobs:
           sbom: true
           provenance: true
       - name: Sign initium-jyq image
-        run: |
-          cosign sign --yes ghcr.io/kitstream/initium-jyq:${{ steps.version.outputs.VERSION }}
-          cosign sign --yes ghcr.io/kitstream/initium-jyq:latest
+        run: cosign sign --yes ghcr.io/kitstream/initium-jyq@${{ steps.build-jyq.outputs.digest }}
       - name: SBOM attestation for initium-jyq image
         run: |
-          cosign attest --yes --predicate <(docker buildx imagetools inspect ghcr.io/kitstream/initium-jyq:${{ steps.version.outputs.VERSION }} --format '{{json .SBOM.SPDX}}') --type spdx ghcr.io/kitstream/initium-jyq:${{ steps.version.outputs.VERSION }}
+          cosign attest --yes --type spdx \
+            --predicate <(docker buildx imagetools inspect ghcr.io/kitstream/initium-jyq@${{ steps.build-jyq.outputs.digest }} --format '{{json .SBOM.SPDX}}') \
+            ghcr.io/kitstream/initium-jyq@${{ steps.build-jyq.outputs.digest }}
