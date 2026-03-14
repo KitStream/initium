@@ -77,15 +77,26 @@ pub fn template_render(input: &str) -> Result<String, String> {
 mod tests {
     use super::*;
 
+    use std::ffi::OsString;
+
     struct EnvGuard {
         name: String,
-        previous: Option<String>,
+        previous: Option<OsString>,
     }
 
     impl EnvGuard {
         fn set(name: &str, value: &str) -> Self {
-            let previous = env::var(name).ok();
+            let previous = env::var_os(name);
             env::set_var(name, value);
+            Self {
+                name: name.to_string(),
+                previous,
+            }
+        }
+
+        fn remove(name: &str) -> Self {
+            let previous = env::var_os(name);
+            env::remove_var(name);
             Self {
                 name: name.to_string(),
                 previous,
@@ -110,7 +121,7 @@ mod tests {
     }
     #[test]
     fn test_envsubst_missing() {
-        env::remove_var("MISSING_VAR_XYZ");
+        let _g = EnvGuard::remove("MISSING_VAR_XYZ");
         assert_eq!(envsubst("${MISSING_VAR_XYZ}"), "${MISSING_VAR_XYZ}");
     }
     #[test]
