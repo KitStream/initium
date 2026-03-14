@@ -29,9 +29,5 @@ docker-multiarch: cross-build
 		-t $(IMAGE):$(VERSION) -t $(IMAGE):latest --push .
 	docker buildx build --platform linux/amd64,linux/arm64 \
 		-f Dockerfile.jyq -t $(IMAGE)-jyq:$(VERSION) -t $(IMAGE)-jyq:latest --push .
-docker-build:
-	docker build -t ghcr.io/kitstream/initium:$(VERSION) .
-docker-push:
-	docker push ghcr.io/kitstream/initium:$(VERSION)
 verify-image:
 	cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity '$(COSIGN_IDENTITY)' $(IMAGE):$(VERSION)

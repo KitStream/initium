@@ -311,9 +311,8 @@ make test
 # Option 1: Use the pre-built image
 kubectl apply -f examples/nginx-waitfor/deployment.yaml
 
-# Option 2: Build and push your own image
-make docker-build VERSION=dev
-make docker-push VERSION=dev
+# Option 2: Cross-build and push multi-arch images
+make docker-multiarch VERSION=dev
 
 # Option 3: Use the Helm chart
 helm install my-app charts/initium \
