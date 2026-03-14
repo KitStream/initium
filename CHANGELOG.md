@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Cosign keyless image signing in release workflow for both `initium` and `initium-jyq` container images. Images are signed using Sigstore OIDC via GitHub Actions. SBOM attestations are also signed and attached to each image.
+- Added `make verify-image` target to verify cosign signatures locally.
+
 ### Added
 
 - `urlencode` template filter for percent-encoding strings in URLs. Useful for embedding passwords or other values containing URL-reserved characters (`@`, `%`, `:`, `/`, etc.) in connection strings.

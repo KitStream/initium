@@ -1,6 +1,6 @@
 BINARY   := initium
 VERSION  ?= dev
-.PHONY: all build test lint clean
+.PHONY: all build test lint clean verify-image
 all: lint test build
 build:
 cargo build --release
@@ -17,3 +17,5 @@ docker-build:
 docker build -t ghcr.io/kitstream/initium:$(VERSION) .
 docker-push:
 docker push ghcr.io/kitstream/initium:$(VERSION)
+verify-image:
+cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp '^https://github\.com/KitStream/initium/' ghcr.io/kitstream/initium:$(VERSION)
