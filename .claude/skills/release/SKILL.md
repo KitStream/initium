@@ -35,7 +35,7 @@ Once confirmed:
 
 1. Fetch origin and create a branch: `release/vX.Y.Z` from `origin/main`.
 2. Bump version in `Cargo.toml` (the `version = "..."` field under `[package]`).
-3. Run `cargo check` to ensure the project builds successfully after the version bump.
+3. Run `cargo check` to ensure the project builds successfully after the version bump. This also updates `Cargo.lock` — always include `Cargo.lock` in the release commit.
 4. Update `CHANGELOG.md`:
    - Move everything under `## [Unreleased]` into a new `## [X.Y.Z] - YYYY-MM-DD` section (use today's date), placed immediately below `## [Unreleased]` (i.e., at the top of the released versions list).
    - Leave `## [Unreleased]` empty (with just the heading).
@@ -43,7 +43,7 @@ Once confirmed:
 5. Search all documentation files (`docs/`, `README.md`, `examples/`) for references to the previous version (e.g. image tags like `initium:1.3.1`, version strings) and update them to the new version. Exclude `CHANGELOG.md` (historical entries should keep their original versions).
 6. Run `cargo test` to verify nothing is broken.
 7. Run `cargo clippy -- -D warnings` and `cargo fmt -- --check`.
-8. Commit: `release: vX.Y.Z`
+8. Commit all changed files (`Cargo.toml`, `Cargo.lock`, `CHANGELOG.md`, docs): `release: vX.Y.Z`
 9. Push the branch and create a PR with title `release: vX.Y.Z`.
 10. The PR body should include the changelog entries for this version.
 
