@@ -38,13 +38,12 @@ pub fn run(
         schema::SeedPlan::from_yaml(&rendered)?
     };
 
-    let db_url = plan.resolve_db_url()?;
     let tracking_table = plan.database.tracking_table.clone();
     let driver = plan.database.driver.clone();
 
     log.info("connecting to database", &[("driver", driver.as_str())]);
 
-    let db = db::connect(&driver, &db_url)?;
+    let db = db::connect(&plan.database)?;
     let mut exec = executor::SeedExecutor::new(log, db, tracking_table, reset)
         .with_dry_run(dry_run)
         .with_reconcile_all(reconcile_all);

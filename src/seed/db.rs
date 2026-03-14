@@ -1554,29 +1554,125 @@ impl Database for MysqlDb {
     }
 }
 
-pub fn connect(driver: &str, url: &str) -> Result<Box<dyn Database>, String> {
+pub fn connect(config: &crate::seed::schema::DatabaseConfig) -> Result<Box<dyn Database>, String> {
+    let driver = config.driver.as_str();
+
+    if config.has_structured_config() {
+        return connect_structured(config);
+    }
+
+    let url = if !config.url_env.is_empty() {
+        std::env::var(&config.url_env).map_err(|_| {
+            format!(
+                "environment variable '{}' not set for database URL",
+                config.url_env
+            )
+        })?
+    } else if !config.url.is_empty() {
+        config.url.clone()
+    } else {
+        std::env::var("DATABASE_URL").map_err(|_| {
+            "no database URL configured: set database.url, database.url_env, or DATABASE_URL env var, or use structured fields (host, port, user, password, name)".to_string()
+        })?
+    };
+
     match driver {
         #[cfg(feature = "sqlite")]
-        "sqlite" => Ok(Box::new(SqliteDb::connect(url)?)),
+        "sqlite" => Ok(Box::new(SqliteDb::connect(&url)?)),
         #[cfg(feature = "postgres")]
-        "postgres" | "postgresql" => Ok(Box::new(PostgresDb::connect(url)?)),
+        "postgres" | "postgresql" => Ok(Box::new(PostgresDb::connect(&url)?)),
         #[cfg(feature = "mysql")]
-        "mysql" => Ok(Box::new(MysqlDb::connect(url)?)),
-        _ => {
-            let mut supported = Vec::new();
-            #[cfg(feature = "sqlite")]
-            supported.push("sqlite");
-            #[cfg(feature = "postgres")]
-            supported.push("postgres");
-            #[cfg(feature = "mysql")]
-            supported.push("mysql");
-            Err(format!(
-                "unsupported database driver: '{}' (supported: {})",
-                driver,
-                supported.join(", ")
-            ))
-        }
+        "mysql" => Ok(Box::new(MysqlDb::connect(&url)?)),
+        _ => Err(unsupported_driver_error(driver)),
     }
+}
+
+fn connect_structured(
+    config: &crate::seed::schema::DatabaseConfig,
+) -> Result<Box<dyn Database>, String> {
+    let driver = config.driver.as_str();
+    match driver {
+        #[cfg(feature = "sqlite")]
+        "sqlite" => {
+            Err("structured database config is not supported for sqlite; use url instead".into())
+        }
+        #[cfg(feature = "postgres")]
+        "postgres" | "postgresql" => {
+            let dsn = build_postgres_dsn(config);
+            Ok(Box::new(PostgresDb::connect(&dsn)?))
+        }
+        #[cfg(feature = "mysql")]
+        "mysql" => {
+            let port = config.port.unwrap_or(3306);
+            let mut opts = mysql::OptsBuilder::default()
+                .ip_or_hostname(Some(&config.host))
+                .tcp_port(port);
+            if !config.user.is_empty() {
+                opts = opts.user(Some(&config.user));
+            }
+            if !config.password.is_empty() {
+                opts = opts.pass(Some(&config.password));
+            }
+            if !config.name.is_empty() {
+                opts = opts.db_name(Some(&config.name));
+            }
+            let pool = mysql::Pool::new(opts).map_err(|e| format!("connecting to mysql: {}", e))?;
+            let conn = pool
+                .get_conn()
+                .map_err(|e| format!("getting mysql connection: {}", e))?;
+            Ok(Box::new(MysqlDb {
+                conn,
+                in_transaction: false,
+            }))
+        }
+        _ => Err(unsupported_driver_error(driver)),
+    }
+}
+
+#[cfg(feature = "postgres")]
+fn build_postgres_dsn(config: &crate::seed::schema::DatabaseConfig) -> String {
+    let mut parts = Vec::new();
+    parts.push(format!("host='{}'", escape_dsn_value(&config.host)));
+    parts.push(format!("port='{}'", config.port.unwrap_or(5432)));
+    if !config.user.is_empty() {
+        parts.push(format!("user='{}'", escape_dsn_value(&config.user)));
+    }
+    if !config.password.is_empty() {
+        parts.push(format!("password='{}'", escape_dsn_value(&config.password)));
+    }
+    if !config.name.is_empty() {
+        parts.push(format!("dbname='{}'", escape_dsn_value(&config.name)));
+    }
+    let mut keys: Vec<&String> = config.options.keys().collect();
+    keys.sort();
+    for key in keys {
+        let value = &config.options[key];
+        parts.push(format!(
+            "{}='{}'",
+            escape_dsn_value(key),
+            escape_dsn_value(value)
+        ));
+    }
+    parts.join(" ")
+}
+
+fn escape_dsn_value(val: &str) -> String {
+    val.replace('\\', "\\\\").replace('\'', "\\'")
+}
+
+fn unsupported_driver_error(driver: &str) -> String {
+    let mut supported = Vec::new();
+    #[cfg(feature = "sqlite")]
+    supported.push("sqlite");
+    #[cfg(feature = "postgres")]
+    supported.push("postgres");
+    #[cfg(feature = "mysql")]
+    supported.push("mysql");
+    format!(
+        "unsupported database driver: '{}' (supported: {})",
+        driver,
+        supported.join(", ")
+    )
 }
 
 fn sanitize_identifier(name: &str) -> String {
@@ -1685,14 +1781,125 @@ mod tests {
 
     #[test]
     fn test_connect_unsupported_driver() {
-        let result = connect("oracle", "localhost");
+        let config = crate::seed::schema::DatabaseConfig {
+            driver: "oracle".into(),
+            url: "localhost".into(),
+            ..Default::default()
+        };
+        let result = connect(&config);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_connect_sqlite() {
-        let db = connect("sqlite", ":memory:");
+        let config = crate::seed::schema::DatabaseConfig {
+            driver: "sqlite".into(),
+            url: ":memory:".into(),
+            ..Default::default()
+        };
+        let db = connect(&config);
         assert!(db.is_ok());
+    }
+
+    #[test]
+    fn test_connect_structured_sqlite_rejected() {
+        let config = crate::seed::schema::DatabaseConfig {
+            driver: "sqlite".into(),
+            host: "localhost".into(),
+            ..Default::default()
+        };
+        let result = connect(&config);
+        let err = result.err().expect("expected error");
+        assert!(err.contains("not supported for sqlite"));
+    }
+
+    #[test]
+    fn test_escape_dsn_value() {
+        assert_eq!(escape_dsn_value("simple"), "simple");
+        assert_eq!(escape_dsn_value("it's"), "it\\'s");
+        assert_eq!(escape_dsn_value("back\\slash"), "back\\\\slash");
+        assert_eq!(escape_dsn_value("p@ss:word"), "p@ss:word");
+    }
+
+    #[cfg(feature = "postgres")]
+    #[test]
+    fn test_build_postgres_dsn() {
+        use std::collections::HashMap;
+        let config = crate::seed::schema::DatabaseConfig {
+            driver: "postgres".into(),
+            host: "pg.example.com".into(),
+            port: Some(5432),
+            user: "admin".into(),
+            password: "s3cr't".into(),
+            name: "mydb".into(),
+            options: {
+                let mut m = HashMap::new();
+                m.insert("sslmode".into(), "disable".into());
+                m
+            },
+            ..Default::default()
+        };
+        let dsn = build_postgres_dsn(&config);
+        assert!(dsn.contains("host='pg.example.com'"));
+        assert!(dsn.contains("port='5432'"));
+        assert!(dsn.contains("user='admin'"));
+        assert!(dsn.contains("password='s3cr\\'t'"));
+        assert!(dsn.contains("dbname='mydb'"));
+        assert!(dsn.contains("sslmode='disable'"));
+    }
+
+    #[cfg(feature = "postgres")]
+    #[test]
+    fn test_build_postgres_dsn_default_port() {
+        let config = crate::seed::schema::DatabaseConfig {
+            driver: "postgres".into(),
+            host: "localhost".into(),
+            user: "app".into(),
+            name: "db".into(),
+            ..Default::default()
+        };
+        let dsn = build_postgres_dsn(&config);
+        assert!(dsn.contains("port='5432'"));
+        assert!(!dsn.contains("password="));
+    }
+
+    #[test]
+    fn test_connect_url_from_env() {
+        std::env::set_var("TEST_CONNECT_DB_URL_39", "sqlite::memory:");
+        let config = crate::seed::schema::DatabaseConfig {
+            driver: "sqlite".into(),
+            url_env: "TEST_CONNECT_DB_URL_39".into(),
+            ..Default::default()
+        };
+        // Should resolve from env var - but :memory: with sqlite: prefix won't work,
+        // so we just check the env resolution part by testing with a valid sqlite URL
+        std::env::set_var("TEST_CONNECT_DB_URL_39", ":memory:");
+        let result = connect(&config);
+        assert!(result.is_ok());
+        std::env::remove_var("TEST_CONNECT_DB_URL_39");
+    }
+
+    #[test]
+    fn test_connect_missing_url_env() {
+        std::env::remove_var("TEST_MISSING_DB_URL_39");
+        let config = crate::seed::schema::DatabaseConfig {
+            driver: "sqlite".into(),
+            url_env: "TEST_MISSING_DB_URL_39".into(),
+            ..Default::default()
+        };
+        let err = connect(&config).err().expect("expected error");
+        assert!(err.contains("TEST_MISSING_DB_URL_39"));
+    }
+
+    #[test]
+    fn test_connect_no_url_no_env_no_structured() {
+        std::env::remove_var("DATABASE_URL");
+        let config = crate::seed::schema::DatabaseConfig {
+            driver: "sqlite".into(),
+            ..Default::default()
+        };
+        let err = connect(&config).err().expect("expected error");
+        assert!(err.contains("no database URL configured"));
     }
 
     #[test]

@@ -29,11 +29,54 @@ initium seed --spec /seeds/seed.yaml --json
 
 The seed spec file defines the complete seeding plan. Both YAML and JSON formats are supported (file extension determines parser). The spec file is a MiniJinja template rendered with environment variables before parsing.
 
+### Database connection
+
+Two connection styles are supported. Choose **one** — they cannot be combined.
+
+**URL-based** (existing behavior):
+
+```yaml
+database:
+  driver: postgres
+  url: "postgres://user:pass@host:5432/dbname"
+  # or: url_env: DATABASE_URL
+```
+
+**Structured fields** (no URL encoding needed):
+
+```yaml
+database:
+  driver: postgres
+  host: pg.example.com
+  port: 5432                       # Optional. Default: 5432 (postgres), 3306 (mysql)
+  user: netbird
+  password: "{{ env.DB_PASSWORD }}" # Special chars just work — no URL encoding
+  name: mydb
+  options:                         # Optional. Driver-specific connection parameters
+    sslmode: disable
+```
+
+Structured config builds the connection using driver-native APIs, bypassing URL parsing entirely. Passwords with `@`, `%`, `:`, or other URL-reserved characters work without encoding.
+
+> **Note:** Structured config is not supported for SQLite — use `url` instead.
+
+### Full schema
+
 ```yaml
 database:
   driver: postgres # Required. One of: postgres, mysql, sqlite
+  # --- URL-based connection (pick one style) ---
   url: "postgres://..." # Direct database URL
   url_env: DATABASE_URL # Or: name of env var containing the URL
+  # --- Structured connection (alternative to url/url_env) ---
+  host: pg.example.com # Database host
+  port: 5432 # Optional. Default per driver
+  user: myuser # Database user
+  password: "secret" # Database password (special chars OK)
+  name: mydb # Database name
+  options: # Optional. Driver-specific parameters
+    sslmode: disable
+  # --- Common ---
   tracking_table: initium_seed # Default: "initium_seed"
 
 phases:
@@ -68,12 +111,18 @@ phases:
 
 ### Field reference
 
-| Field                                           | Type     | Required | Description                                                      |
-| ----------------------------------------------- | -------- | -------- | ---------------------------------------------------------------- |
-| `database.driver`                               | string   | Yes      | Database driver: `postgres`, `mysql`, or `sqlite`                |
-| `database.url`                                  | string   | No       | Direct database connection URL                                   |
-| `database.url_env`                              | string   | No       | Environment variable containing the database URL                 |
-| `database.tracking_table`                       | string   | No       | Name of the seed tracking table (default: `initium_seed`)        |
+| Field                                           | Type              | Required | Description                                                                  |
+| ----------------------------------------------- | ----------------- | -------- | ---------------------------------------------------------------------------- |
+| `database.driver`                               | string            | Yes      | Database driver: `postgres`, `mysql`, or `sqlite`                            |
+| `database.url`                                  | string            | No       | Direct database connection URL (cannot combine with structured fields)       |
+| `database.url_env`                              | string            | No       | Environment variable containing the database URL                             |
+| `database.host`                                 | string            | No       | Database host (structured config; cannot combine with url/url_env)           |
+| `database.port`                                 | integer           | No       | Database port (default: 5432 for postgres, 3306 for mysql)                   |
+| `database.user`                                 | string            | No       | Database user (structured config)                                            |
+| `database.password`                             | string            | No       | Database password — special characters work without encoding                 |
+| `database.name`                                 | string            | No       | Database name (structured config)                                            |
+| `database.options`                              | map[string]string | No       | Driver-specific connection parameters (e.g. `sslmode: disable`)              |
+| `database.tracking_table`                       | string            | No       | Name of the seed tracking table (default: `initium_seed`)                    |
 | `phases[].name`                                 | string   | Yes      | Unique phase name                                                |
 | `phases[].order`                                | integer  | No       | Execution order (lower first, default: 0)                        |
 | `phases[].database`                             | string   | No       | Target database name (for create/switch)                         |
@@ -115,13 +164,17 @@ phases:
 
 SQLite does not support separate databases or schemas — each file is a database.
 
-### Database URL resolution
+### Database connection resolution
 
-The database URL is resolved in this order:
+If structured fields (`host`, `port`, `user`, `password`, `name`) are provided, the connection is built using driver-native APIs — no URL is needed.
+
+Otherwise, the database URL is resolved in this order:
 
 1. `database.url_env` — environment variable name containing the URL
 2. `database.url` — direct URL in the spec file
 3. `DATABASE_URL` — fallback environment variable
+
+Structured fields and URL-based fields (`url`/`url_env`) are mutually exclusive — specifying both is a validation error.
 
 ## Features
 
@@ -385,6 +438,7 @@ spec:
 See the [`examples/seed/`](../examples/seed/) directory:
 
 - [`basic-seed.yaml`](../examples/seed/basic-seed.yaml) — PostgreSQL with departments and employees, cross-table references
+- [`structured-config-seed.yaml`](../examples/seed/structured-config-seed.yaml) — PostgreSQL with structured connection config (no URL encoding)
 - [`sqlite-seed.yaml`](../examples/seed/sqlite-seed.yaml) — SQLite configuration table seeding
 - [`env-credentials-seed.yaml`](../examples/seed/env-credentials-seed.yaml) — MySQL with credentials from Kubernetes secrets
 - [`phased-seed.yaml`](../examples/seed/phased-seed.yaml) — Multi-phase PostgreSQL seeding with wait-for, create-if-missing, and MiniJinja templating
