@@ -28,7 +28,7 @@ Quality gates
 
 6. Update CHANGELOG with all changes.
    - Every user-visible change must be added to CHANGELOG.md under “Unreleased”.
-   - Use categories: Added / Changed / Fixed / Security / Deprecated / Removed.
+   - Use categories: Added / Changed / Fixed / Security / Deprecated / Removed / Chores.
    - Mention migration steps if behavior changes.
 
 Robustness & correctness

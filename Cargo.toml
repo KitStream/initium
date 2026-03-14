@@ -1,6 +1,6 @@
 [package]
 name = "initium"
-version = "1.3.1"
+version = "2.0.0"
 authors = ["Kitstream <opensource@kitstream.io>"]
 categories = ["command-line-utilities", "development-tools"]
 documentation = "https://docs.rs/initium"
