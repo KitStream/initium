@@ -121,7 +121,7 @@ Definition of done
 - Code compiles without warnings.
 - Code is linted.
 - Code is formatted.
-- `dprint check` passes with no issues (Markdown, JSON, TOML, Dockerfile).
+- `dprint check` passes with no issues (Markdown, JSON, TOML, YAML, Dockerfile).
 - Tests pass.
 - Docs updated.
 - CHANGELOG updated.

@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `urlencode` template filter for percent-encoding strings in URLs. Useful for embedding passwords or other values containing URL-reserved characters (`@`, `%`, `:`, `/`, etc.) in connection strings.
-- `dprint` formatter for Markdown, JSON, TOML, and Dockerfile with CI check (`dprint/check@v2.2`) and definition-of-done gate.
+- `dprint` formatter for Markdown, JSON, TOML, YAML, and Dockerfile with CI check (`dprint/check@v2.2`) and definition-of-done gate.
 
 ### Changed
 

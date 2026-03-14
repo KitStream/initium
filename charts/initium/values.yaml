@@ -37,49 +37,48 @@ sampleDeployment:
 #
 # Example: wait for Postgres, render config, then run migration
 initContainers:
-  # - name: wait-for-postgres
-  #   command: ["wait-for"]
-  #   args:
-  #     - --target
-  #     - tcp://postgres:5432
-  #     - --timeout
-  #     - "120s"
-  #     - --max-attempts
-  #     - "30"
+# - name: wait-for-postgres
+#   command: ["wait-for"]
+#   args:
+#     - --target
+#     - tcp://postgres:5432
+#     - --timeout
+#     - "120s"
+#     - --max-attempts
+#     - "30"
 
-  # - name: render-config
-  #   command: ["render"]
-  #   args:
-  #     - --template
-  #     - /templates/app.conf.tmpl
-  #     - --output
-  #     - config/app.conf
-  #     - --workdir
-  #     - /work
-  #   env:
-  #     - name: DB_HOST
-  #       value: postgres
-  #     - name: DB_PORT
-  #       value: "5432"
+# - name: render-config
+#   command: ["render"]
+#   args:
+#     - --template
+#     - /templates/app.conf.tmpl
+#     - --output
+#     - config/app.conf
+#     - --workdir
+#     - /work
+#   env:
+#     - name: DB_HOST
+#       value: postgres
+#     - name: DB_PORT
+#       value: "5432"
 
-  # - name: run-migration
-  #   command: ["migrate"]
-  #   args:
-  #     - --
-  #     - /usr/bin/flyway
-  #     - migrate
-  #   env:
-  #     - name: FLYWAY_URL
-  #       value: jdbc:postgresql://postgres:5432/mydb
+# - name: run-migration
+#   command: ["migrate"]
+#   args:
+#     - --
+#     - /usr/bin/flyway
+#     - migrate
+#   env:
+#     - name: FLYWAY_URL
+#       value: jdbc:postgresql://postgres:5432/mydb
 
 # Additional volumes to mount into initContainers
 extraVolumes: []
-  # - name: templates
-  #   configMap:
-  #     name: app-templates
+# - name: templates
+#   configMap:
+#     name: app-templates
 
 extraVolumeMounts: []
-  # - name: templates
-  #   mountPath: /templates
-  #   readOnly: true
-
+# - name: templates
+#   mountPath: /templates
+#   readOnly: true
