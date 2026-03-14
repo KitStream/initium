@@ -1603,6 +1603,12 @@ fn connect_structured(
         }
         #[cfg(feature = "mysql")]
         "mysql" => {
+            if !config.options.is_empty() {
+                return Err(format!(
+                    "structured database config does not support 'options' for mysql (unsupported keys: {})",
+                    config.options.keys().cloned().collect::<Vec<_>>().join(", ")
+                ));
+            }
             let port = config.port.unwrap_or(3306);
             let mut opts = mysql::OptsBuilder::default()
                 .ip_or_hostname(Some(&config.host))
@@ -1811,6 +1817,27 @@ mod tests {
         let result = connect(&config);
         let err = result.err().expect("expected error");
         assert!(err.contains("not supported for sqlite"));
+    }
+
+    #[cfg(feature = "mysql")]
+    #[test]
+    fn test_connect_structured_mysql_rejects_options() {
+        use std::collections::HashMap;
+        let config = crate::seed::schema::DatabaseConfig {
+            driver: "mysql".into(),
+            host: "localhost".into(),
+            user: "root".into(),
+            name: "test".into(),
+            options: {
+                let mut m = HashMap::new();
+                m.insert("charset".into(), "utf8mb4".into());
+                m
+            },
+            ..Default::default()
+        };
+        let err = connect(&config).err().expect("expected error");
+        assert!(err.contains("does not support 'options' for mysql"));
+        assert!(err.contains("charset"));
     }
 
     #[test]

@@ -48,11 +48,11 @@ database:
 database:
   driver: postgres
   host: pg.example.com
-  port: 5432                       # Optional. Default: 5432 (postgres), 3306 (mysql)
+  port: 5432 # Optional. Default: 5432 (postgres), 3306 (mysql)
   user: netbird
   password: "{{ env.DB_PASSWORD }}" # Special chars just work — no URL encoding
   name: mydb
-  options:                         # Optional. Driver-specific connection parameters
+  options: # Optional. Driver-specific connection parameters
     sslmode: disable
 ```
 
@@ -111,36 +111,36 @@ phases:
 
 ### Field reference
 
-| Field                                           | Type              | Required | Description                                                                  |
-| ----------------------------------------------- | ----------------- | -------- | ---------------------------------------------------------------------------- |
-| `database.driver`                               | string            | Yes      | Database driver: `postgres`, `mysql`, or `sqlite`                            |
-| `database.url`                                  | string            | No       | Direct database connection URL (cannot combine with structured fields)       |
-| `database.url_env`                              | string            | No       | Environment variable containing the database URL                             |
-| `database.host`                                 | string            | No       | Database host (structured config; cannot combine with url/url_env)           |
-| `database.port`                                 | integer           | No       | Database port (default: 5432 for postgres, 3306 for mysql)                   |
-| `database.user`                                 | string            | No       | Database user (structured config)                                            |
-| `database.password`                             | string            | No       | Database password — special characters work without encoding                 |
-| `database.name`                                 | string            | No       | Database name (structured config)                                            |
-| `database.options`                              | map[string]string | No       | Driver-specific connection parameters (e.g. `sslmode: disable`)              |
-| `database.tracking_table`                       | string            | No       | Name of the seed tracking table (default: `initium_seed`)                    |
-| `phases[].name`                                 | string   | Yes      | Unique phase name                                                |
-| `phases[].order`                                | integer  | No       | Execution order (lower first, default: 0)                        |
-| `phases[].database`                             | string   | No       | Target database name (for create/switch)                         |
-| `phases[].schema`                               | string   | No       | Target schema name (for create/switch)                           |
-| `phases[].create_if_missing`                    | boolean  | No       | Create the database/schema if it does not exist (default: false) |
-| `phases[].timeout`                              | string   | No       | Default wait timeout (e.g. `30s`, `1m`, `1m30s`; default: `30s`) |
-| `phases[].wait_for[].type`                      | string   | Yes      | Object type: `table`, `view`, `schema`, or `database`            |
-| `phases[].wait_for[].name`                      | string   | Yes      | Object name to wait for                                          |
-| `phases[].wait_for[].timeout`                   | string   | No       | Per-object timeout override (e.g. `60s`, `2m`, `1m30s`)          |
-| `phases[].seed_sets[].name`                     | string   | Yes      | Unique name for the seed set (used in tracking)                  |
-| `phases[].seed_sets[].order`                    | integer  | No       | Execution order (lower values first, default: 0)                 |
-| `phases[].seed_sets[].mode`                     | string   | No       | Seed mode: `once` (default) or `reconcile`                       |
-| `phases[].seed_sets[].tables[].table`           | string   | Yes      | Target database table name                                       |
-| `phases[].seed_sets[].tables[].order`           | integer  | No       | Execution order within the seed set (default: 0)                 |
-| `phases[].seed_sets[].tables[].unique_key`      | string[] | No       | Columns for duplicate detection                                  |
-| `phases[].seed_sets[].tables[].auto_id.column`  | string   | No       | Auto-generated ID column name                                    |
-| `phases[].seed_sets[].tables[].auto_id.id_type` | string   | No       | ID type (default: `integer`)                                     |
-| `phases[].seed_sets[].tables[].rows[]._ref`     | string   | No       | Internal reference name for cross-table references               |
+| Field                                           | Type              | Required | Description                                                            |
+| ----------------------------------------------- | ----------------- | -------- | ---------------------------------------------------------------------- |
+| `database.driver`                               | string            | Yes      | Database driver: `postgres`, `mysql`, or `sqlite`                      |
+| `database.url`                                  | string            | No       | Direct database connection URL (cannot combine with structured fields) |
+| `database.url_env`                              | string            | No       | Environment variable containing the database URL                       |
+| `database.host`                                 | string            | No       | Database host (structured config; cannot combine with url/url_env)     |
+| `database.port`                                 | integer           | No       | Database port (default: 5432 for postgres, 3306 for mysql)             |
+| `database.user`                                 | string            | No       | Database user (structured config)                                      |
+| `database.password`                             | string            | No       | Database password — special characters work without encoding           |
+| `database.name`                                 | string            | No       | Database name (structured config)                                      |
+| `database.options`                              | map[string]string | No       | Driver-specific connection parameters (e.g. `sslmode: disable`)        |
+| `database.tracking_table`                       | string            | No       | Name of the seed tracking table (default: `initium_seed`)              |
+| `phases[].name`                                 | string            | Yes      | Unique phase name                                                      |
+| `phases[].order`                                | integer           | No       | Execution order (lower first, default: 0)                              |
+| `phases[].database`                             | string            | No       | Target database name (for create/switch)                               |
+| `phases[].schema`                               | string            | No       | Target schema name (for create/switch)                                 |
+| `phases[].create_if_missing`                    | boolean           | No       | Create the database/schema if it does not exist (default: false)       |
+| `phases[].timeout`                              | string            | No       | Default wait timeout (e.g. `30s`, `1m`, `1m30s`; default: `30s`)       |
+| `phases[].wait_for[].type`                      | string            | Yes      | Object type: `table`, `view`, `schema`, or `database`                  |
+| `phases[].wait_for[].name`                      | string            | Yes      | Object name to wait for                                                |
+| `phases[].wait_for[].timeout`                   | string            | No       | Per-object timeout override (e.g. `60s`, `2m`, `1m30s`)                |
+| `phases[].seed_sets[].name`                     | string            | Yes      | Unique name for the seed set (used in tracking)                        |
+| `phases[].seed_sets[].order`                    | integer           | No       | Execution order (lower values first, default: 0)                       |
+| `phases[].seed_sets[].mode`                     | string            | No       | Seed mode: `once` (default) or `reconcile`                             |
+| `phases[].seed_sets[].tables[].table`           | string            | Yes      | Target database table name                                             |
+| `phases[].seed_sets[].tables[].order`           | integer           | No       | Execution order within the seed set (default: 0)                       |
+| `phases[].seed_sets[].tables[].unique_key`      | string[]          | No       | Columns for duplicate detection                                        |
+| `phases[].seed_sets[].tables[].auto_id.column`  | string            | No       | Auto-generated ID column name                                          |
+| `phases[].seed_sets[].tables[].auto_id.id_type` | string            | No       | ID type (default: `integer`)                                           |
+| `phases[].seed_sets[].tables[].rows[]._ref`     | string            | No       | Internal reference name for cross-table references                     |
 
 ### Wait-for object support by driver
 
