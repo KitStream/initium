@@ -76,9 +76,35 @@ pub fn template_render(input: &str) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct EnvGuard {
+        name: String,
+        previous: Option<String>,
+    }
+
+    impl EnvGuard {
+        fn set(name: &str, value: &str) -> Self {
+            let previous = env::var(name).ok();
+            env::set_var(name, value);
+            Self {
+                name: name.to_string(),
+                previous,
+            }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            match &self.previous {
+                Some(val) => env::set_var(&self.name, val),
+                None => env::remove_var(&self.name),
+            }
+        }
+    }
+
     #[test]
     fn test_envsubst_basic() {
-        env::set_var("TEST_RENDER_VAR", "hello");
+        let _g = EnvGuard::set("TEST_RENDER_VAR", "hello");
         assert_eq!(envsubst("say ${TEST_RENDER_VAR}"), "say hello");
         assert_eq!(envsubst("say $TEST_RENDER_VAR"), "say hello");
     }
@@ -97,17 +123,17 @@ mod tests {
     }
     #[test]
     fn test_envsubst_empty_value() {
-        env::set_var("TEST_EMPTY_VAR", "");
+        let _g = EnvGuard::set("TEST_EMPTY_VAR", "");
         assert_eq!(envsubst("${TEST_EMPTY_VAR}"), "");
     }
     #[test]
     fn test_envsubst_special_chars() {
-        env::set_var("TEST_SPECIAL", "a=b&c");
+        let _g = EnvGuard::set("TEST_SPECIAL", "a=b&c");
         assert_eq!(envsubst("${TEST_SPECIAL}"), "a=b&c");
     }
     #[test]
     fn test_envsubst_multiline() {
-        env::set_var("TEST_ML", "val");
+        let _g = EnvGuard::set("TEST_ML", "val");
         let input = "line1 ${TEST_ML}\nline2 $TEST_ML";
         let output = envsubst(input);
         assert!(output.contains("line1 val"));
@@ -115,13 +141,13 @@ mod tests {
     }
     #[test]
     fn test_envsubst_adjacent() {
-        env::set_var("TEST_A", "X");
-        env::set_var("TEST_B", "Y");
+        let _g1 = EnvGuard::set("TEST_A", "X");
+        let _g2 = EnvGuard::set("TEST_B", "Y");
         assert_eq!(envsubst("${TEST_A}${TEST_B}"), "XY");
     }
     #[test]
     fn test_template_basic() {
-        env::set_var("TEST_TPL_VAR", "world");
+        let _g = EnvGuard::set("TEST_TPL_VAR", "world");
         let result = template_render("hello {{ env.TEST_TPL_VAR }}").unwrap();
         assert_eq!(result, "hello world");
     }
@@ -136,7 +162,7 @@ mod tests {
     }
     #[test]
     fn test_template_urlencode() {
-        env::set_var("TEST_URLENCODE_VAR", "p@ss%word");
+        let _g = EnvGuard::set("TEST_URLENCODE_VAR", "p@ss%word");
         let result = template_render("{{ env.TEST_URLENCODE_VAR | urlencode }}").unwrap();
         assert_eq!(result, "p%40ss%25word");
     }
@@ -147,7 +173,7 @@ mod tests {
     }
     #[test]
     fn test_template_conditional() {
-        env::set_var("TEST_COND", "yes");
+        let _g = EnvGuard::set("TEST_COND", "yes");
         let result = template_render("{% if env.TEST_COND %}ok{% endif %}").unwrap();
         assert_eq!(result, "ok");
     }
