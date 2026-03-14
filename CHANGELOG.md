@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Render tests now use an RAII `EnvGuard` to restore environment variables on drop, preventing cross-test interference when tests run in parallel.
 - Auto Tag workflow now uses `RELEASE_TOKEN` instead of `GITHUB_TOKEN` so the pushed tag triggers the Release workflow. Tags pushed by the default `GITHUB_TOKEN` do not trigger other workflows (GitHub Actions security feature).
 
 ## [1.3.0] - 2026-03-12
