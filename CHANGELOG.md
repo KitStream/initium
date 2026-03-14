@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Chores
 
 - Added integration tests for structured database connectivity: special-character passwords (URL-reserved chars like `@`, `:`, `/`, `?`, `#`, `%`), PostgreSQL `options` field (`connect_timeout`), and `create_if_missing` with non-existent database ([#50](https://github.com/KitStream/initium/issues/50)).
+- Release workflow: replaced QEMU-emulated multi-arch Docker builds with native cross-compilation using `cargo-zigbuild` + `sccache`. Build time reduced from ~50 minutes to ~8-12 minutes.
+- Release workflow: split into parallel `test`, `build` (matrix: amd64 + arm64), `docker`, and `publish` jobs. Crates.io publish now runs after Docker images are pushed.
+- CI workflow: `build` job now cross-compiles for both amd64 and arm64 using `cargo-zigbuild` + `sccache`, warming the cache for release builds.
+- Dockerfiles (`Dockerfile`, `Dockerfile.jyq`): replaced multi-stage Rust build with minimal images that COPY pre-built binaries. No more in-Docker compilation.
+- Switched `mysql` crate from `native-tls` (OpenSSL) to `rustls-tls`, eliminating the OpenSSL dependency entirely. Binary size stays at ~5 MB.
+- Makefile: added `cross-build` and `docker-multiarch` targets for local multi-arch builds.
+- README: added Development section with cross-compilation and sccache setup instructions.
 
 ## [2.0.1] - 2026-03-14
 
